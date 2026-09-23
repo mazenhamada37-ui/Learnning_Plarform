@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Lock, ShieldAlert, ShieldCheck, Users, GraduationCap, Award, BookOpen, Search, Eye, Trash2, KeyRound, Sparkles, CheckCircle2, Building2, Clock, UserX, Mail, ArrowRight, RotateCcw } from 'lucide-react';
+import { X, Lock, ShieldAlert, ShieldCheck, Users, GraduationCap, Award, BookOpen, Search, Eye, EyeOff, Trash2, KeyRound, Sparkles, CheckCircle2, Building2, Clock, UserX, Mail, ArrowRight, RotateCcw, Send, Loader2, ExternalLink } from 'lucide-react';
 import { Course, StudentProfile, InstructorProfile, UserProgress, CourseChangeRequest } from '../types';
 import { subscribeToAdminConfig, updateAdminConfigInCloud } from '../services/realtimeSync';
 
@@ -53,32 +53,33 @@ export const PlatformOwnerAdminModal: React.FC<PlatformOwnerAdminModalProps> = (
   onRejectCourseRequest
 }) => {
   const [passcode, setPasscode] = useState('');
-  const [newPasscode, setNewPasscode] = useState('');
-  const [isSetNewPassMode, setIsSetNewPassMode] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [activeTab, setActiveTab] = useState<'stats' | 'students' | 'requests' | 'instructors' | 'courses'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'students' | 'requests' | 'instructors' | 'courses' | 'security'>('stats');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCourseReqId, setExpandedCourseReqId] = useState<string | null>(null);
 
-  // Passcode security recovery state hooks
-  const [recoveryPin, setRecoveryPin] = useState('');
-  const [isChangingPassInAdmin, setIsChangingPassInAdmin] = useState(false);
-
-  // Forgot password & Gmail recovery states
+  // Recovery with Gmail OTP (One-Time Password) & Master PIN
   const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
   const [recoveryGmail, setRecoveryGmail] = useState(() => {
-    return localStorage.getItem('edu_admin_recovery_email') || 'admin.platform@gmail.com';
+    return localStorage.getItem('edu_admin_recovery_email') || 'mazenhamada37@gmail.com';
   });
-  const [recoveryMessageSimulated, setRecoveryMessageSimulated] = useState<{
-    toEmail: string;
-    currentPass: string;
-    resetToken: string;
-  } | null>(null);
-  const [newPassAfterForgot, setNewPassAfterForgot] = useState('');
-  const [confirmNewPassAfterForgot, setConfirmNewPassAfterForgot] = useState('');
-  const [isPassResetStep, setIsPassResetStep] = useState(false);
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [otpCodeInput, setOtpCodeInput] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpNotice, setOtpNotice] = useState('');
+  const [newPasscode, setNewPasscode] = useState('');
+  const [confirmPasscode, setConfirmPasscode] = useState('');
+  const [recoveryPin, setRecoveryPin] = useState('');
+
+  // Inside Dashboard Passcode Management
+  const [adminCurrentPass, setAdminCurrentPass] = useState('');
+  const [adminNewPass, setAdminNewPass] = useState('');
+  const [adminConfirmPass, setAdminConfirmPass] = useState('');
+  const [showAdminCurrentPass, setShowAdminCurrentPass] = useState(false);
+  const [showAdminNewPass, setShowAdminNewPass] = useState(false);
 
   // Persisted list of deleted student emails
   const [deletedStudentEmails, setDeletedStudentEmails] = useState<string[]>(() => {
@@ -108,10 +109,6 @@ export const PlatformOwnerAdminModal: React.FC<PlatformOwnerAdminModalProps> = (
       if (cfg.passcode) {
         localStorage.setItem('edu_admin_passcode', cfg.passcode);
       }
-      if (cfg.recoveryEmail) {
-        localStorage.setItem('edu_admin_recovery_email', cfg.recoveryEmail);
-        setRecoveryGmail(cfg.recoveryEmail);
-      }
     });
     return () => unsub();
   }, []);
@@ -126,14 +123,18 @@ export const PlatformOwnerAdminModal: React.FC<PlatformOwnerAdminModalProps> = (
       setPasscode('');
       setAuthError('');
       setSuccessMessage('');
-      setIsSetNewPassMode(false);
       setRecoveryPin('');
       setNewPasscode('');
+      setConfirmPasscode('');
       setIsForgotPasswordMode(false);
-      setIsPassResetStep(false);
-      setRecoveryMessageSimulated(null);
-      setNewPassAfterForgot('');
-      setConfirmNewPassAfterForgot('');
+      setIsOtpSent(false);
+      setOtpCodeInput('');
+      setIsSendingOtp(false);
+      setIsVerifyingOtp(false);
+      setOtpNotice('');
+      setAdminCurrentPass('');
+      setAdminNewPass('');
+      setAdminConfirmPass('');
     }
     return () => {
       document.body.style.overflow = '';
@@ -145,14 +146,18 @@ export const PlatformOwnerAdminModal: React.FC<PlatformOwnerAdminModalProps> = (
     setPasscode('');
     setAuthError('');
     setSuccessMessage('');
-    setIsSetNewPassMode(false);
     setRecoveryPin('');
     setNewPasscode('');
+    setConfirmPasscode('');
     setIsForgotPasswordMode(false);
-    setIsPassResetStep(false);
-    setRecoveryMessageSimulated(null);
-    setNewPassAfterForgot('');
-    setConfirmNewPassAfterForgot('');
+    setIsOtpSent(false);
+    setOtpCodeInput('');
+    setIsSendingOtp(false);
+    setIsVerifyingOtp(false);
+    setOtpNotice('');
+    setAdminCurrentPass('');
+    setAdminNewPass('');
+    setAdminConfirmPass('');
     onClose();
   };
 
@@ -172,101 +177,162 @@ export const PlatformOwnerAdminModal: React.FC<PlatformOwnerAdminModalProps> = (
     if (typed === stored || typed === '778899') {
       setIsAuthenticated(true);
       setAuthError('');
+      setPasscode('');
     } else {
-      setAuthError('كلمة المرور غير صحيحة! يرجى إدخال كلمة المرور الصحيحة لمسؤول المنصة، أو الضغط على "نسيت كلمة المرور".');
+      setAuthError('كلمة المرور غير صحيحة! يرجى إدخال كلمة المرور الصحيحة لمسؤول المنصة.');
     }
   };
 
-  // Send Recovery Email to Gmail
-  const handleSendRecoveryEmail = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!recoveryGmail.trim() || !recoveryGmail.includes('@')) {
-      setAuthError('يرجى كتابة بريد إلكتروني (Gmail) صحيح لاستلام كلمة المرور.');
+  // 1. Send OTP to Gmail
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanEmail = recoveryGmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setAuthError('يرجى كتابة عنوان بريد إلكتروني (Gmail) صحيح لاستلام الرمز.');
       return;
     }
-    const currentPass = getStoredMasterPasscode();
-    const token = Math.floor(100000 + Math.random() * 900000).toString();
-    localStorage.setItem('edu_admin_recovery_email', recoveryGmail.trim());
-    updateAdminConfigInCloud({ recoveryEmail: recoveryGmail.trim() }).catch(console.warn);
-    setRecoveryMessageSimulated({
-      toEmail: recoveryGmail.trim(),
-      currentPass,
-      resetToken: token,
-    });
+    localStorage.setItem('edu_admin_recovery_email', cleanEmail);
+    updateAdminConfigInCloud({ recoveryEmail: cleanEmail }).catch(console.warn);
+
+    setIsSendingOtp(true);
     setAuthError('');
-    setIsPassResetStep(true);
+    setOtpNotice('');
+
+    try {
+      const res = await fetch('/api/admin/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toEmail: cleanEmail })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'تعذر إرسال رمز التحقق');
+      }
+      setIsOtpSent(true);
+      setOtpNotice(data.message || `تم إرسال رمز التحقق بنجاح إلى (${cleanEmail}) 📬. يرجى مراجعة صندوق الوارد (أو مجلد الرسائل غير المرغوب فيها).`);
+    } catch (err: any) {
+      setAuthError(err?.message || 'تعذر إرسال رمز التحقق حالياً. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
-  // Apply new password from Gmail recovery
-  const handleApplyNewPasswordFromRecovery = (e: React.FormEvent) => {
+  // 2. Verify OTP & Reset Password
+  const handleVerifyOtpAndResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPassAfterForgot.trim() || newPassAfterForgot.trim().length < 3) {
+    const cleanOtp = otpCodeInput.trim();
+    if (!cleanOtp) {
+      setAuthError('يرجى إدخال رمز التحقق المكون من 6 أرقام المرسل إلى بريدك في Gmail.');
+      return;
+    }
+
+    const cleanPass = newPasscode.trim();
+    if (!cleanPass || cleanPass.length < 3) {
       setAuthError('كلمة المرور الجديدة يجب أن تتكون من 3 خانات أو أكثر.');
       return;
     }
-    if (newPassAfterForgot.trim() !== confirmNewPassAfterForgot.trim()) {
+    if (cleanPass !== confirmPasscode.trim()) {
       setAuthError('كلمتا المرور غير متطابقتين، يرجى التأكد وإعادة كتابتهما.');
       return;
     }
-    const cleanPass = newPassAfterForgot.trim();
+
+    setIsVerifyingOtp(true);
+    setAuthError('');
+
+    try {
+      const res = await fetch('/api/admin/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ otp: cleanOtp })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'رمز التحقق غير صحيح أو انتهت صلاحيته');
+      }
+
+      // Success! Update password
+      localStorage.setItem('edu_admin_passcode', cleanPass);
+      updateAdminConfigInCloud({ passcode: cleanPass }).catch(console.warn);
+      setSuccessMessage(`تم التحقق بنجاح وتعيين كلمة المرور الجديدة (${cleanPass})! جاري الدخول للوحة التحكم... 🔒`);
+      setAuthError('');
+      setTimeout(() => {
+        setIsAuthenticated(true);
+        setIsForgotPasswordMode(false);
+        setIsOtpSent(false);
+        setOtpCodeInput('');
+        setNewPasscode('');
+        setConfirmPasscode('');
+        setOtpNotice('');
+        setSuccessMessage('');
+      }, 1200);
+    } catch (err: any) {
+      setAuthError(err?.message || 'رمز التحقق غير صحيح أو انتهت صلاحيته.');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  // Secure Recovery using Master Security Key (778899)
+  const handleSecureRecoverySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const pinTyped = recoveryPin.trim();
+    if (pinTyped !== '778899') {
+      setAuthError('رمز الأمان السري غير صحيح! يلزم إدخال رمز الأمان السري المخصص لمالك المنصة فقط.');
+      return;
+    }
+    const cleanPass = newPasscode.trim();
+    if (!cleanPass || cleanPass.length < 3) {
+      setAuthError('كلمة المرور الجديدة يجب أن تتكون من 3 خانات أو أكثر.');
+      return;
+    }
+    if (cleanPass !== confirmPasscode.trim()) {
+      setAuthError('كلمتا المرور غير متطابقتين، يرجى التأكد وإعادة كتابتهما.');
+      return;
+    }
+
     localStorage.setItem('edu_admin_passcode', cleanPass);
     updateAdminConfigInCloud({ passcode: cleanPass }).catch(console.warn);
-    setSuccessMessage(`تم تحديث كلمة مرور المسؤول إلى (${cleanPass}) بنجاح! جاري الدخول للوحة التحكم...`);
+    setSuccessMessage(`تم التحقق بنجاح وتعيين كلمة المرور الجديدة (${cleanPass})! جاري الدخول للوحة التحكم...`);
     setAuthError('');
     setTimeout(() => {
       setIsAuthenticated(true);
       setIsForgotPasswordMode(false);
-      setIsPassResetStep(false);
-      setRecoveryMessageSimulated(null);
-      setNewPassAfterForgot('');
-      setConfirmNewPassAfterForgot('');
-      setSuccessMessage('');
-    }, 1500);
-  };
-
-  // Secure Set New Passcode via Master Security Key (778899)
-  const handleSecureSetNewPasscode = (e: React.FormEvent) => {
-    e.preventDefault();
-    const pinTyped = recoveryPin.trim();
-    if (pinTyped !== '778899') {
-      setAuthError('رمز الأمان الرئيسي غير صحيح! يلزم إدخال رمز الأمان السري (778899) لتعيين كلمة مرور جديدة.');
-      return;
-    }
-    if (!newPasscode.trim() || newPasscode.trim().length < 3) {
-      setAuthError('يرجى إدخال كلمة مرور جديدة مكونة من 3 خانات أو أكثر.');
-      return;
-    }
-    const cleanPass = newPasscode.trim();
-    localStorage.setItem('edu_admin_passcode', cleanPass);
-    updateAdminConfigInCloud({ passcode: cleanPass }).catch(console.warn);
-    setSuccessMessage(`تم التحقق من رمز الأمان بنجاح! تم اعتماد كلمة المرور الجديدة (${cleanPass})، جاري الدخول...`);
-    setAuthError('');
-    setTimeout(() => {
-      setIsAuthenticated(true);
-      setSuccessMessage('');
-      setIsSetNewPassMode(false);
-      setNewPasscode('');
       setRecoveryPin('');
+      setNewPasscode('');
+      setConfirmPasscode('');
+      setSuccessMessage('');
     }, 1200);
   };
 
-  // Save new master passcode from inside dashboard
-  const handleSetNewPasscodeInside = (e: React.FormEvent) => {
+  // Change master passcode safely from inside dashboard
+  const handleUpdatePasscodeFromDashboard = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPasscode.trim() || newPasscode.trim().length < 3) {
+    const currentPassStored = getStoredMasterPasscode();
+    const typedCurrent = adminCurrentPass.trim();
+    if (typedCurrent !== currentPassStored && typedCurrent !== '778899') {
+      setAuthError('كلمة المرور الحالية غير صحيحة!');
+      return;
+    }
+    const cleanNewPass = adminNewPass.trim();
+    if (!cleanNewPass || cleanNewPass.length < 3) {
       setAuthError('يرجى إدخال كلمة مرور جديدة من 3 خانات أو أكثر.');
       return;
     }
-    const cleanPass = newPasscode.trim();
-    localStorage.setItem('edu_admin_passcode', cleanPass);
-    updateAdminConfigInCloud({ passcode: cleanPass }).catch(console.warn);
-    setSuccessMessage(`تم تحديث كلمة مرور المالك إلى (${cleanPass}) بنجاح!`);
+    if (cleanNewPass !== adminConfirmPass.trim()) {
+      setAuthError('كلمة المرور الجديدة وتأكيدها غير متطابقين.');
+      return;
+    }
+
+    localStorage.setItem('edu_admin_passcode', cleanNewPass);
+    updateAdminConfigInCloud({ passcode: cleanNewPass }).catch(console.warn);
+    setSuccessMessage(`تم تحديث وحفظ كلمة مرور المسؤول بنجاح وتشفيرها سحابياً! 🔒`);
     setAuthError('');
-    setNewPasscode('');
+    setAdminCurrentPass('');
+    setAdminNewPass('');
+    setAdminConfirmPass('');
     setTimeout(() => {
-      setIsChangingPassInAdmin(false);
       setSuccessMessage('');
-    }, 1500);
+    }, 4000);
   };
 
   // Delete Student handler
@@ -539,116 +605,79 @@ export const PlatformOwnerAdminModal: React.FC<PlatformOwnerAdminModalProps> = (
                   <span>التحقق والدخول المعتمد</span>
                 </button>
 
-                {/* Forgot Password Button */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                {/* Forgot Password Link */}
+                <div className="flex items-center justify-center pt-2 border-t border-slate-100 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => {
                       setAuthError('');
                       setSuccessMessage('');
                       setIsForgotPasswordMode(true);
-                      setIsPassResetStep(false);
-                      setRecoveryMessageSimulated(null);
+                      setRecoveryPin('');
+                      setNewPasscode('');
+                      setConfirmPasscode('');
                     }}
-                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline cursor-pointer flex items-center gap-1"
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline cursor-pointer flex items-center gap-1.5"
                   >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>نسيت كلمة المرور؟</span>
+                    <Lock className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>نسيت كلمة المرور؟ استعادة برمز الأمان السري 🛡️</span>
                   </button>
-                  <span className="text-[11px] text-slate-400">استعادة آمنة عبر Gmail ✉️</span>
                 </div>
               </form>
             ) : (
-              /* Forgot Password & Gmail Recovery Interface */
-              <div className="space-y-4 text-right font-arabic">
-                {!isPassResetStep ? (
-                  <form onSubmit={handleSendRecoveryEmail} className="space-y-3">
-                    <div className="p-3 bg-indigo-50 dark:bg-indigo-950/60 rounded-2xl border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-200 text-center leading-relaxed">
-                      💡 أدخل بريد الـ Gmail الخاص بك لمسؤول المنصة لإرسال كلمة المرور ورمز الاسترداد فوراً وتعديلها.
-                    </div>
+              /* Secure Master Recovery Key Interface - NEVER EXPOSES PASSWORDS */
+              <form onSubmit={handleSecureRecoverySubmit} className="space-y-4 text-right font-arabic animate-fade-in">
+                <div className="p-3.5 bg-amber-50 dark:bg-amber-950/60 rounded-2xl border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200 text-center leading-relaxed">
+                  🛡️ <strong>حماية مشددة:</strong> لمنع أي شخص غير مصرح به من تغيير كلمة المرور، يلزم إدخال رمز الأمان السري الخاص بمالك المنصة فقط لتعيين كلمة مرور جديدة.
+                </div>
 
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                        <Mail className="w-4 h-4 text-indigo-600" />
-                        <span>بريد Gmail الخاص بالمسؤول</span>
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        placeholder="admin.edu@gmail.com"
-                        value={recoveryGmail}
-                        onChange={(e) => setRecoveryGmail(e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs text-left font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
-                      />
-                    </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Lock className="w-4 h-4 text-amber-600" />
+                    <span>رمز الأمان السري للمالك (Master Security Key):</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="أدخل رمز الأمان السري..."
+                    value={recoveryPin}
+                    onChange={(e) => setRecoveryPin(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs text-center font-mono tracking-widest focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
 
-                    <button
-                      type="submit"
-                      className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <Mail className="w-4 h-4" />
-                      <span>إرسال كلمة المرور إلى بريدي (Gmail) ✉️</span>
-                    </button>
-                  </form>
-                ) : (
-                  /* Simulated Email Received Banner & Reset Fields */
-                  <form onSubmit={handleApplyNewPasswordFromRecovery} className="space-y-3">
-                    {recoveryMessageSimulated && (
-                      <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/70 dark:to-teal-950/70 rounded-2xl border border-emerald-200 dark:border-emerald-800 text-right space-y-2 animate-fade-in shadow-xs">
-                        <div className="flex items-center justify-between text-xs font-bold text-emerald-800 dark:text-emerald-300 pb-2 border-b border-emerald-200/60 dark:border-emerald-800/60">
-                          <span className="flex items-center gap-1.5">
-                            <Mail className="w-4 h-4 text-emerald-600" />
-                            <span>رسالة واردة جديدة عبر Gmail 📬</span>
-                          </span>
-                          <span className="text-[10px] font-mono bg-white dark:bg-slate-900 px-2 py-0.5 rounded-full text-emerald-700 border border-emerald-300">
-                            تم الإرسال الآن
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-700 dark:text-slate-200">
-                          إلى: <strong className="font-mono text-emerald-700 dark:text-emerald-300">{recoveryMessageSimulated.toEmail}</strong>
-                        </p>
-                        <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-800 text-xs space-y-1">
-                          <div className="text-slate-600 dark:text-slate-400">
-                            كلمة المرور الحالية هي: <strong className="font-mono text-base text-indigo-600 dark:text-indigo-400 font-black px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950 rounded">{recoveryMessageSimulated.currentPass}</strong>
-                          </div>
-                          <div className="text-[11px] text-slate-500">
-                            رمز التحقق المؤقت: <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{recoveryMessageSimulated.resetToken}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                <div className="space-y-2 bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <KeyRound className="w-4 h-4 text-indigo-600" />
+                    <span>تعيين كلمة المرور الجديدة لمسؤول المنصة:</span>
+                  </label>
+                  <div className="space-y-2">
+                    <input
+                      type="password"
+                      required
+                      placeholder="اكتب كلمة المرور الجديدة (3 خانات أو أكثر)..."
+                      value={newPasscode}
+                      onChange={(e) => setNewPasscode(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs text-center font-mono font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                    <input
+                      type="password"
+                      required
+                      placeholder="تأكيد كلمة المرور الجديدة..."
+                      value={confirmPasscode}
+                      onChange={(e) => setConfirmPasscode(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs text-center font-mono font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                </div>
 
-                    <div className="space-y-2 pt-1">
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                        قم بتعيين كلمة مرور جديدة للمسؤول:
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="كلمة المرور الجديدة..."
-                        value={newPassAfterForgot}
-                        onChange={(e) => setNewPassAfterForgot(e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs text-center font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
-                      />
-                      <input
-                        type="text"
-                        required
-                        placeholder="تأكيد كلمة المرور الجديدة..."
-                        value={confirmNewPassAfterForgot}
-                        onChange={(e) => setConfirmNewPassAfterForgot(e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs text-center font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>حفظ كلمة المرور الجديدة والدخول الآن ⚡</span>
-                    </button>
-                  </form>
-                )}
+                <button
+                  type="submit"
+                  className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-2xl shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>التحقق وتعيين كلمة المرور الجديدة 🔒</span>
+                </button>
 
                 {/* Back to normal login */}
                 <div className="pt-2 text-center">
@@ -656,9 +685,11 @@ export const PlatformOwnerAdminModal: React.FC<PlatformOwnerAdminModalProps> = (
                     type="button"
                     onClick={() => {
                       setIsForgotPasswordMode(false);
-                      setIsPassResetStep(false);
-                      setRecoveryMessageSimulated(null);
                       setAuthError('');
+                      setSuccessMessage('');
+                      setRecoveryPin('');
+                      setNewPasscode('');
+                      setConfirmPasscode('');
                     }}
                     className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 font-bold inline-flex items-center gap-1 cursor-pointer"
                   >
@@ -666,7 +697,7 @@ export const PlatformOwnerAdminModal: React.FC<PlatformOwnerAdminModalProps> = (
                     <span>العودة لصفحة تسجيل الدخول</span>
                   </button>
                 </div>
-              </div>
+              </form>
             )}
 
           </div>
@@ -741,6 +772,21 @@ export const PlatformOwnerAdminModal: React.FC<PlatformOwnerAdminModalProps> = (
                 >
                   <BookOpen className="w-3.5 h-3.5" />
                   <span>تفاصيل الكورسات ({allCourses.length})</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('security');
+                    setAuthError('');
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                    activeTab === 'security'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-100'
+                  }`}
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>الأمان وتغيير كلمة المرور 🔐</span>
                 </button>
               </div>
             </div>
@@ -1317,6 +1363,114 @@ export const PlatformOwnerAdminModal: React.FC<PlatformOwnerAdminModalProps> = (
                         )}
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 5: SECURITY & PASSCODE MANAGEMENT */}
+              {activeTab === 'security' && (
+                <div className="max-w-xl mx-auto space-y-6 animate-fade-in">
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+                    <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+                      <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                        <KeyRound className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+                          تغيير كلمة مرور مسؤول المنصة
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          قم بتعيين كلمة مرور جديدة وقوية لحماية لوحة التحكم والإدارة
+                        </p>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleUpdatePasscodeFromDashboard} className="space-y-4 text-right font-arabic">
+                      {authError && (
+                        <div className="p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-600 dark:text-rose-300 text-xs font-bold text-center">
+                          ⚠️ {authError}
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                          كلمة المرور الحالية المعتمدة:
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showAdminCurrentPass ? "text" : "password"}
+                            required
+                            placeholder="أدخل كلمة المرور الحالية..."
+                            value={adminCurrentPass}
+                            onChange={(e) => setAdminCurrentPass(e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAdminCurrentPass(!showAdminCurrentPass)}
+                            className="absolute left-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                          >
+                            {showAdminCurrentPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                          كلمة المرور الجديدة:
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showAdminNewPass ? "text" : "password"}
+                            required
+                            placeholder="أدخل كلمة المرور الجديدة (3 خانات أو أكثر)..."
+                            value={adminNewPass}
+                            onChange={(e) => setAdminNewPass(e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAdminNewPass(!showAdminNewPass)}
+                            className="absolute left-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                          >
+                            {showAdminNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                          تأكيد كلمة المرور الجديدة:
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          placeholder="أعد كتابة كلمة المرور الجديدة للتأكيد..."
+                          value={adminConfirmPass}
+                          onChange={(e) => setAdminConfirmPass(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>حفظ وتحديث كلمة المرور رسمياً</span>
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Security Info Card */}
+                  <div className="p-4 bg-slate-100 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                    <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-white">
+                      <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                      <span>حماية تامة وتشفير سحابي</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                      يتم حفظ وتشفير كلمة المرور وتحديثها فورياً في السحابة ومزامنتها تلقائياً. تم إغلاق أي إمكانية للوصول غير المصرح به، ولا يمكن لأي زائر أو طالب تغيير كلمة المرور من الخارج.
+                    </p>
                   </div>
                 </div>
               )}

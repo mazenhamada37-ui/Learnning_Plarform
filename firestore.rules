@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Public read and write for educational platform collections to allow seamless real-time sync across mobile and laptop
+    // Educational platform collections allowing cross-device real-time sync
     match /courses/{courseId} {
       allow read, write: if true;
     }
@@ -11,7 +11,16 @@ service cloud.firestore {
     match /students/{studentId} {
       allow read, write: if true;
     }
+    match /pendingStudents/{studentId} {
+      allow read, write: if true;
+    }
     match /instructors/{instructorId} {
+      allow read, write: if true;
+    }
+    match /pendingInstructors/{instructorId} {
+      allow read, write: if true;
+    }
+    match /studentProgress/{studentId} {
       allow read, write: if true;
     }
     match /platformMeta/{metaId} {

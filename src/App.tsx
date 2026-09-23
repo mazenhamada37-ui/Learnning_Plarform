@@ -24,6 +24,14 @@ import {
   subscribeToStudents,
   subscribeToInstructors,
   subscribeToReviews,
+  subscribeToPendingStudents,
+  savePendingStudentToCloud,
+  deletePendingStudentFromCloud,
+  subscribeToPendingInstructors,
+  savePendingInstructorToCloud,
+  deletePendingInstructorFromCloud,
+  subscribeToStudentProgress,
+  saveStudentProgressToCloud,
   seedInitialCoursesIfEmpty,
   saveCourseToCloud,
   deleteCourseFromCloud,
@@ -309,11 +317,57 @@ export default function App() {
     const unsubStudents = subscribeToStudents((cloudStudents) => {
       setExtraRegisteredStudents(cloudStudents);
       localStorage.setItem('edu_registered_students', JSON.stringify(cloudStudents));
+      // Real-time update for current active student when approved by admin
+      setStudentProfile((prev) => {
+        if (!prev) return prev;
+        const matched = cloudStudents.find(
+          (s) => s.email.toLowerCase() === prev.email.toLowerCase()
+        );
+        if (matched && (!prev.isApproved || prev.status === 'pending')) {
+          const approvedProfile: StudentProfile = {
+            ...prev,
+            ...matched,
+            status: 'approved',
+            isApproved: true
+          };
+          localStorage.setItem('edu_student_profile', JSON.stringify(approvedProfile));
+          return approvedProfile;
+        }
+        return prev;
+      });
+    });
+
+    const unsubPendingStudents = subscribeToPendingStudents((cloudPending) => {
+      setPendingStudentRequests(cloudPending);
+      localStorage.setItem('edu_pending_students', JSON.stringify(cloudPending));
     });
 
     const unsubInstructors = subscribeToInstructors((cloudInstructors) => {
       setExtraRegisteredInstructors(cloudInstructors);
       localStorage.setItem('edu_registered_instructors', JSON.stringify(cloudInstructors));
+      // Real-time update for current active instructor when approved by admin
+      setInstructorProfile((prev) => {
+        if (!prev) return prev;
+        const matched = cloudInstructors.find(
+          (i) => i.email.toLowerCase() === prev.email.toLowerCase()
+        );
+        if (matched && (!prev.isApproved || prev.status === 'pending')) {
+          const approvedProfile: InstructorProfile = {
+            ...prev,
+            ...matched,
+            status: 'approved',
+            isApproved: true
+          };
+          localStorage.setItem('edu_instructor_profile', JSON.stringify(approvedProfile));
+          return approvedProfile;
+        }
+        return prev;
+      });
+    });
+
+    const unsubPendingInstructors = subscribeToPendingInstructors((cloudPending) => {
+      setPendingInstructorRequests(cloudPending);
+      localStorage.setItem('edu_pending_instructors', JSON.stringify(cloudPending));
     });
 
     const unsubReviews = subscribeToReviews((cloudReviews) => {
@@ -327,10 +381,26 @@ export default function App() {
       unsubCourses();
       unsubRequests();
       unsubStudents();
+      unsubPendingStudents();
       unsubInstructors();
+      unsubPendingInstructors();
       unsubReviews();
     };
   }, []);
+
+  // Real-time Cross-Device Progress Synchronization (Instant sync between Mobile, Tablet & PC)
+  useEffect(() => {
+    if (!studentProfile?.email) return;
+    const unsubProgress = subscribeToStudentProgress(studentProfile.email, (cloudProgress) => {
+      if (cloudProgress && typeof cloudProgress === 'object') {
+        setUserProgressMap((prev) => ({
+          ...prev,
+          ...cloudProgress
+        }));
+      }
+    });
+    return () => unsubProgress();
+  }, [studentProfile?.email]);
 
   // Handle Add New Review with Real-time & Optimistic Average Recalculation
   const handleAddReview = async (newReviewData: Omit<CourseReview, 'id' | 'createdAt'>) => {
@@ -420,7 +490,7 @@ export default function App() {
 
       const courseFullyDone = updatedLessonIds.length === totalLessonsCount && totalLessonsCount > 0;
 
-      return {
+      const updatedProgressMap = {
         ...prev,
         [courseId]: {
           ...current,
@@ -429,6 +499,13 @@ export default function App() {
           lastStudiedAt: new Date().toISOString()
         }
       };
+
+      // Sync updated progress to Firestore immediately for cross-device updates (phone <-> laptop)
+      if (studentProfile?.email) {
+        saveStudentProgressToCloud(studentProfile.email, updatedProgressMap).catch(console.warn);
+      }
+
+      return updatedProgressMap;
     });
   };
 
@@ -490,7 +567,7 @@ export default function App() {
 
       const isPassed = scorePercent >= 70;
 
-      return {
+      const updatedProgressMap = {
         ...prev,
         [courseId]: {
           ...current,
@@ -499,42 +576,68 @@ export default function App() {
           certificateIssuedAt: isPassed ? new Date().toISOString() : current.certificateIssuedAt
         }
       };
+
+      // Sync quiz result & certificate to Firestore for cross-device access
+      if (studentProfile?.email) {
+        saveStudentProgressToCloud(studentProfile.email, updatedProgressMap).catch(console.warn);
+      }
+
+      return updatedProgressMap;
     });
   };
 
   // Enrolled courses list
   const enrolledCourses = courses.filter((c) => userProgressMap[c.id]);
 
-  // Handle Saving Student Profile Data
+  // Handle Saving Student Profile Data (Strict Admin Approval Enforcement)
   const handleSaveProfile = (profile: StudentProfile) => {
     const cleanEmail = profile.email.trim().toLowerCase();
-    const isApproved = extraRegisteredStudents.some((s) => s.email.trim().toLowerCase() === cleanEmail) ||
-                       (studentProfile && studentProfile.email.trim().toLowerCase() === cleanEmail);
+    
+    // Check if the student is already in the approved list
+    const isApproved = extraRegisteredStudents.some(
+      (s) => s.email.trim().toLowerCase() === cleanEmail && s.isApproved !== false
+    );
     const isDeleted = deletedStudentEmails.includes(cleanEmail);
 
     if (!isApproved || isDeleted) {
-      // Send to pending approval requests
+      // Must await admin approval
+      const pendingProfile: StudentProfile = {
+        ...profile,
+        status: 'pending',
+        isApproved: false
+      };
+
+      // 1. Save to cloud pendingStudents collection
+      savePendingStudentToCloud(pendingProfile).catch(console.warn);
+
+      // 2. Add to pending list locally
       setPendingStudentRequests((prev) => {
         const filtered = prev.filter((p) => p.email.toLowerCase() !== cleanEmail);
-        const updated = [...filtered, profile];
+        const updated = [...filtered, pendingProfile];
         localStorage.setItem('edu_pending_students', JSON.stringify(updated));
         return updated;
       });
-      if (studentProfile && studentProfile.email.trim().toLowerCase() === cleanEmail && !isApproved) {
-        setStudentProfile(null);
-        localStorage.removeItem('edu_student_profile');
-      }
+
+      // 3. Mark current local profile as pending (not approved)
+      setStudentProfile(pendingProfile);
+      localStorage.setItem('edu_student_profile', JSON.stringify(pendingProfile));
+
       return { isPending: true };
     }
 
     // Normal Registration for ALREADY APPROVED student
-    setStudentProfile(profile);
-    localStorage.setItem('edu_student_profile', JSON.stringify(profile));
+    const approvedProfile: StudentProfile = {
+      ...profile,
+      status: 'approved',
+      isApproved: true
+    };
+    setStudentProfile(approvedProfile);
+    localStorage.setItem('edu_student_profile', JSON.stringify(approvedProfile));
     setIsOwnerSession(false);
     localStorage.setItem('edu_is_owner_session', 'false');
     setExtraRegisteredStudents((prev) => {
       const filtered = prev.filter((p) => p.email.toLowerCase() !== cleanEmail);
-      const updated = [...filtered, profile];
+      const updated = [...filtered, approvedProfile];
       localStorage.setItem('edu_registered_students', JSON.stringify(updated));
       return updated;
     });
@@ -558,7 +661,8 @@ export default function App() {
       return updated;
     });
 
-    // 2. Remove from pending
+    // 2. Remove from cloud pending collection & local pending list
+    deletePendingStudentFromCloud(cleanEmail).catch(console.warn);
     setPendingStudentRequests((prev) => {
       const updated = prev.filter((p) => p.email.toLowerCase() !== cleanEmail);
       localStorage.setItem('edu_pending_students', JSON.stringify(updated));
@@ -566,24 +670,33 @@ export default function App() {
     });
 
     if (target) {
-      // 3. Add to extraRegisteredStudents
+      const approvedTarget: StudentProfile = {
+        ...target,
+        status: 'approved',
+        isApproved: true
+      };
+
+      // 3. Save approved student to Cloud Firestore & local
+      saveStudentToCloud(approvedTarget).catch((err) => console.warn('Failed to save student to cloud:', err));
       setExtraRegisteredStudents((prev) => {
         const filtered = prev.filter((p) => p.email.toLowerCase() !== cleanEmail);
-        const updated = [...filtered, target];
+        const updated = [...filtered, approvedTarget];
         localStorage.setItem('edu_registered_students', JSON.stringify(updated));
         return updated;
       });
-      saveStudentToCloud(target).catch((err) => console.warn('Failed to save student to cloud:', err));
 
       // 4. Activate profile if current browser user
-      setStudentProfile(target);
-      localStorage.setItem('edu_student_profile', JSON.stringify(target));
+      if (studentProfile?.email.toLowerCase() === cleanEmail) {
+        setStudentProfile(approvedTarget);
+        localStorage.setItem('edu_student_profile', JSON.stringify(approvedTarget));
+      }
     }
   };
 
   // Admin Reject Pending Student Request
   const handleRejectStudentRequest = (email: string) => {
     const cleanEmail = email.toLowerCase();
+    deletePendingStudentFromCloud(cleanEmail).catch(console.warn);
     setPendingStudentRequests((prev) => {
       const updated = prev.filter((p) => p.email.toLowerCase() !== cleanEmail);
       localStorage.setItem('edu_pending_students', JSON.stringify(updated));
@@ -632,36 +745,55 @@ export default function App() {
     localStorage.removeItem('edu_instructor_profile');
   };
 
-  // Handle Saving Instructor Profile Data
+  // Handle Saving Instructor Profile Data (Strict Admin Approval Enforcement)
   const handleSaveInstructorProfile = (profile: InstructorProfile) => {
     const cleanEmail = profile.email.trim().toLowerCase();
-    const isApproved = extraRegisteredInstructors.some((i) => i.email.trim().toLowerCase() === cleanEmail) ||
-                       (instructorProfile && instructorProfile.email.trim().toLowerCase() === cleanEmail);
+    
+    // Check if the instructor is explicitly approved in the verified registered list
+    const isApproved = extraRegisteredInstructors.some(
+      (i) => i.email.trim().toLowerCase() === cleanEmail && i.isApproved !== false
+    );
     const isDeleted = deletedInstructorEmails.includes(cleanEmail);
 
     if (!isApproved || isDeleted) {
-      // Send to pending instructor approval requests
+      // Must await admin approval
+      const pendingProfile: InstructorProfile = {
+        ...profile,
+        status: 'pending',
+        isApproved: false
+      };
+
+      // 1. Save to cloud pendingInstructors collection
+      savePendingInstructorToCloud(pendingProfile).catch(console.warn);
+
+      // 2. Add to pending instructor requests locally
       setPendingInstructorRequests((prev) => {
         const filtered = prev.filter((p) => p.email.toLowerCase() !== cleanEmail);
-        const updated = [...filtered, profile];
+        const updated = [...filtered, pendingProfile];
         localStorage.setItem('edu_pending_instructors', JSON.stringify(updated));
         return updated;
       });
-      if (instructorProfile && instructorProfile.email.trim().toLowerCase() === cleanEmail && !isApproved) {
-        setInstructorProfile(null);
-        localStorage.removeItem('edu_instructor_profile');
-      }
+
+      // 3. Set instructor profile as pending (locked in studio)
+      setInstructorProfile(pendingProfile);
+      localStorage.setItem('edu_instructor_profile', JSON.stringify(pendingProfile));
+
       return { isPending: true };
     }
 
     // Normal Registration for ALREADY APPROVED instructor
-    setInstructorProfile(profile);
-    localStorage.setItem('edu_instructor_profile', JSON.stringify(profile));
+    const approvedProfile: InstructorProfile = {
+      ...profile,
+      status: 'approved',
+      isApproved: true
+    };
+    setInstructorProfile(approvedProfile);
+    localStorage.setItem('edu_instructor_profile', JSON.stringify(approvedProfile));
     setIsOwnerSession(false);
     localStorage.setItem('edu_is_owner_session', 'false');
     setExtraRegisteredInstructors((prev) => {
       const filtered = prev.filter((p) => p.email.toLowerCase() !== cleanEmail);
-      const updated = [...filtered, profile];
+      const updated = [...filtered, approvedProfile];
       localStorage.setItem('edu_registered_instructors', JSON.stringify(updated));
       return updated;
     });
@@ -681,7 +813,8 @@ export default function App() {
       return updated;
     });
 
-    // 2. Remove from pending
+    // 2. Remove from cloud pending collection & local pending list
+    deletePendingInstructorFromCloud(cleanEmail).catch(console.warn);
     setPendingInstructorRequests((prev) => {
       const updated = prev.filter((p) => p.email.toLowerCase() !== cleanEmail);
       localStorage.setItem('edu_pending_instructors', JSON.stringify(updated));
@@ -689,24 +822,33 @@ export default function App() {
     });
 
     if (target) {
-      // 3. Add to extra registered instructors
+      const approvedTarget: InstructorProfile = {
+        ...target,
+        status: 'approved',
+        isApproved: true
+      };
+
+      // 3. Save approved instructor to Cloud Firestore & local
+      saveInstructorToCloud(approvedTarget).catch((err) => console.warn('Failed to save instructor to cloud:', err));
       setExtraRegisteredInstructors((prev) => {
         const filtered = prev.filter((p) => p.email.toLowerCase() !== cleanEmail);
-        const updated = [...filtered, target];
+        const updated = [...filtered, approvedTarget];
         localStorage.setItem('edu_registered_instructors', JSON.stringify(updated));
         return updated;
       });
-      saveInstructorToCloud(target).catch((err) => console.warn('Failed to save instructor to cloud:', err));
 
-      // 4. Activate profile
-      setInstructorProfile(target);
-      localStorage.setItem('edu_instructor_profile', JSON.stringify(target));
+      // 4. Activate profile if current browser user
+      if (instructorProfile?.email.toLowerCase() === cleanEmail) {
+        setInstructorProfile(approvedTarget);
+        localStorage.setItem('edu_instructor_profile', JSON.stringify(approvedTarget));
+      }
     }
   };
 
   // Admin Reject Pending Instructor Request
   const handleRejectInstructorRequest = (email: string) => {
     const cleanEmail = email.toLowerCase();
+    deletePendingInstructorFromCloud(cleanEmail).catch(console.warn);
     setPendingInstructorRequests((prev) => {
       const updated = prev.filter((p) => p.email.toLowerCase() !== cleanEmail);
       localStorage.setItem('edu_pending_instructors', JSON.stringify(updated));
@@ -824,14 +966,25 @@ export default function App() {
     localStorage.removeItem('edu_instructor_profile');
   };
 
-  // Handle Select Course (verifies student registration before opening player)
+  // Handle Select Course (verifies student registration & approval before opening player)
   const handleSelectCourse = (course: Course) => {
     if (!studentProfile) {
       setPendingCourseToStart(course);
       setIsRegistrationModalOpen(true);
-    } else {
-      setSelectedCourse(course);
+      return;
     }
+
+    const isStudentApproved = studentProfile.isApproved === true || extraRegisteredStudents.some(
+      (s) => s.email.toLowerCase() === studentProfile.email.toLowerCase() && s.isApproved !== false
+    );
+
+    if (!isStudentApproved) {
+      setPendingCourseToStart(course);
+      setIsRegistrationModalOpen(true);
+      return;
+    }
+
+    setSelectedCourse(course);
   };
 
   // Handle Direct Multi-Account Selection on Device
@@ -983,6 +1136,13 @@ export default function App() {
                 onOpenEditCourse={handleOpenEditCourse}
                 pendingCourseRequests={pendingCourseRequests}
                 instructorProfile={instructorProfile}
+                isApprovedInstructor={
+                  !!instructorProfile &&
+                  (instructorProfile.isApproved === true ||
+                    extraRegisteredInstructors.some(
+                      (i) => i.email.toLowerCase() === instructorProfile.email.toLowerCase() && i.isApproved !== false
+                    ))
+                }
                 onOpenRegistrationModal={() => setIsInstructorRegistrationModalOpen(true)}
                 onLogoutInstructor={handleLogoutInstructor}
               />

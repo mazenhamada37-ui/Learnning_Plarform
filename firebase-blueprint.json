@@ -110,9 +110,21 @@
       "schema": "StudentProfile",
       "description": "Registered students synced across all devices"
     },
+    "/pendingStudents/{studentId}": {
+      "schema": "StudentProfile",
+      "description": "Student registrations awaiting platform administrator approval"
+    },
     "/instructors/{instructorId}": {
       "schema": "InstructorProfile",
       "description": "Registered instructors synced across all devices"
+    },
+    "/pendingInstructors/{instructorId}": {
+      "schema": "InstructorProfile",
+      "description": "Instructor registrations awaiting platform administrator approval"
+    },
+    "/studentProgress/{studentId}": {
+      "schema": "PlatformMeta",
+      "description": "Student learning progress, lesson completions and quiz scores across devices"
     },
     "/platformMeta/{metaId}": {
       "schema": "PlatformMeta",

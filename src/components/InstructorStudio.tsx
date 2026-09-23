@@ -12,6 +12,7 @@ interface InstructorStudioProps {
   instructorProfile: InstructorProfile | null;
   onOpenRegistrationModal: () => void;
   onLogoutInstructor?: () => void;
+  isApprovedInstructor?: boolean;
 }
 
 export const InstructorStudio: React.FC<InstructorStudioProps> = ({
@@ -23,7 +24,8 @@ export const InstructorStudio: React.FC<InstructorStudioProps> = ({
   pendingCourseRequests = [],
   instructorProfile,
   onOpenRegistrationModal,
-  onLogoutInstructor
+  onLogoutInstructor,
+  isApprovedInstructor = false
 }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [title, setTitle] = useState('');
@@ -31,6 +33,114 @@ export const InstructorStudio: React.FC<InstructorStudioProps> = ({
   const [category, setCategory] = useState<CategoryType>('برمجة وتطوير');
   const [level, setLevel] = useState<CourseLevel>('متوسط');
   const [estimatedHours, setEstimatedHours] = useState(8);
+
+  // Check if instructor is verified & approved
+  const isApproved = isApprovedInstructor || (instructorProfile?.isApproved === true && instructorProfile.status !== 'pending');
+
+  // If No Instructor Profile Registered Yet -> Show Gated Registration Screen
+  if (!instructorProfile) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12 font-arabic text-center space-y-6" dir="rtl">
+        <div className="bg-white dark:bg-slate-900 p-8 sm:p-12 rounded-3xl border border-amber-200/80 dark:border-amber-900/40 shadow-xl space-y-6">
+          <div className="w-20 h-20 mx-auto rounded-3xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/30 shadow-inner">
+            <Award className="w-10 h-10" />
+          </div>
+          <div className="space-y-3">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+              استوديو المحاضر وإعداد المناهج 👨‍🏫
+            </h2>
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-xl mx-auto leading-relaxed">
+              مرحباً بك! لإضافة وتعديل الدورات التدريبية ونشر المناهج على المنصة، يجب تسجيل بياناتك الرسمية كمحاضر والحصول على موافقة المسؤول أولاً.
+            </p>
+          </div>
+
+          <div className="bg-amber-50/80 dark:bg-amber-950/40 p-4 rounded-2xl border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs sm:text-sm max-w-lg mx-auto flex items-center justify-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>نظام الحماية: يشترط موافقة المسؤول وإدارة المنصة قبل الدخول ونشر أي محتوى.</span>
+          </div>
+
+          <div className="pt-2">
+            <button
+              onClick={onOpenRegistrationModal}
+              className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/25 transition-all active:scale-95 inline-flex items-center gap-2 cursor-pointer"
+            >
+              <UserCheck className="w-5 h-5" />
+              <span>تسجيل بيانات المحاضر الآن للانضمام</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If Registered But Awaiting Admin Approval -> Show Pending Approval Lock Screen
+  if (!isApproved) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12 font-arabic text-center space-y-6" dir="rtl">
+        <div className="bg-white dark:bg-slate-900 p-8 sm:p-12 rounded-3xl border border-amber-300 dark:border-amber-800/80 shadow-2xl space-y-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 left-0 h-2 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 animate-pulse" />
+
+          <div className="w-20 h-20 mx-auto rounded-3xl bg-amber-500/15 text-amber-500 flex items-center justify-center border border-amber-500/30">
+            <Clock className="w-10 h-10 animate-spin-slow" />
+          </div>
+
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold border border-amber-500/30">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>طلب التسجيل قيد المراجعة والاعتماد</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+              أهلاً بك أستاذ {instructorProfile.fullName} 👨‍🏫
+            </h2>
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-xl mx-auto leading-relaxed">
+              تم إرسال طلب تسجيلك كمحاضر في المنصة بنجاح. الطلب الآن معروض في لوحة تحكم المسؤول والإدارة للمراجعة والموافقة عليه قبل منح صلاحيات إنشاء وإدارة الدورات.
+            </p>
+          </div>
+
+          <div className="bg-slate-50 dark:bg-slate-800/60 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 text-right max-w-lg mx-auto space-y-2 text-xs">
+            <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 pb-2 border-b border-slate-200 dark:border-slate-700">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <span>بيانات الطلب المقدم:</span>
+            </div>
+            <div className="flex justify-between text-slate-600 dark:text-slate-300">
+              <span>الاسم الكامل:</span>
+              <span className="font-bold text-slate-900 dark:text-white">{instructorProfile.fullName}</span>
+            </div>
+            <div className="flex justify-between text-slate-600 dark:text-slate-300">
+              <span>البريد الإلكتروني:</span>
+              <span className="font-bold text-slate-900 dark:text-white">{instructorProfile.email}</span>
+            </div>
+            <div className="flex justify-between text-slate-600 dark:text-slate-300">
+              <span>المسمى الوظيفي:</span>
+              <span className="font-bold text-slate-900 dark:text-white">{instructorProfile.title}</span>
+            </div>
+          </div>
+
+          <div className="bg-emerald-50 dark:bg-emerald-950/40 p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs max-w-lg mx-auto flex items-center justify-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>المنصة متصلة بقاعدة البيانات السحابية - سيتم فتح استوديو المحاضر تلقائياً فور موافقة المسؤول دون الحاجة لتحديث الصفحة.</span>
+          </div>
+
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={onOpenRegistrationModal}
+              className="px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all"
+            >
+              تعديل بيانات التسجيل
+            </button>
+            {onLogoutInstructor && (
+              <button
+                onClick={onLogoutInstructor}
+                className="px-5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 text-xs font-bold transition-all"
+              >
+                تسجيل الخروج
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Filter pending course requests submitted by this lecturer
   const myPendingRequests = pendingCourseRequests.filter(

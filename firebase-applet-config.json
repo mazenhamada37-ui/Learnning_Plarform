@@ -1,12 +1,12 @@
 {
-  "projectId": "rapid-scheme-xmn89",
-  "appId": "1:469678658587:web:db0210a71b90acbac194be",
-  "apiKey": "AIzaSyBqOrxDvKSPsps9XVGW3Un_2XX4UKMS_DY",
-  "authDomain": "rapid-scheme-xmn89.firebaseapp.com",
+  "projectId": "gen-lang-client-0229681775",
+  "appId": "1:34575801530:web:096a1b996a2248edaff683",
+  "apiKey": "AIzaSyBgdkDJ_U6jAUeOa6a2bl2qaaZj0c0EYVo",
+  "authDomain": "gen-lang-client-0229681775.firebaseapp.com",
+  "storageBucket": "gen-lang-client-0229681775.firebasestorage.app",
+  "messagingSenderId": "34575801530",
   "firestoreDatabaseId": "ai-studio-eduplatform-32384904-1616-4a5a-97d1-120d6e0966ca",
-  "storageBucket": "rapid-scheme-xmn89.firebasestorage.app",
-  "messagingSenderId": "469678658587",
   "measurementId": "",
-  "oAuthClientId": "469678658587-ubmpmsaet59k2mf87e82k8gj9kjkq3dd.apps.googleusercontent.com",
+  "oAuthClientId": "34575801530-tndjvc9t9vh9aol9hgvqvp5hv3bf7tk1.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

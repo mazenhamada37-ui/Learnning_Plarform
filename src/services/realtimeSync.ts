@@ -208,6 +208,52 @@ export async function deleteStudentFromCloud(email: string): Promise<void> {
 }
 
 /**
+ * Real-time subscription to pending student approval requests
+ */
+export function subscribeToPendingStudents(onUpdate: (students: StudentProfile[]) => void) {
+  const col = collection(db, 'pendingStudents');
+  return onSnapshot(
+    col,
+    (snapshot) => {
+      const students: StudentProfile[] = [];
+      snapshot.forEach((docSnap) => {
+        students.push(docSnap.data() as StudentProfile);
+      });
+      onUpdate(students);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'pendingStudents');
+    }
+  );
+}
+
+/**
+ * Save a pending student registration to Firestore awaiting admin approval
+ */
+export async function savePendingStudentToCloud(student: StudentProfile): Promise<void> {
+  try {
+    const safeDocId = encodeURIComponent(student.email.toLowerCase());
+    await setDoc(doc(db, 'pendingStudents', safeDocId), { ...student, status: 'pending', isApproved: false });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `pendingStudents/${student.email}`);
+    throw error;
+  }
+}
+
+/**
+ * Delete or remove a pending student request from Firestore
+ */
+export async function deletePendingStudentFromCloud(email: string): Promise<void> {
+  try {
+    const safeDocId = encodeURIComponent(email.toLowerCase());
+    await deleteDoc(doc(db, 'pendingStudents', safeDocId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `pendingStudents/${email}`);
+    throw error;
+  }
+}
+
+/**
  * Real-time subscription to registered instructors
  */
 export function subscribeToInstructors(onUpdate: (instructors: InstructorProfile[]) => void) {
@@ -228,12 +274,58 @@ export function subscribeToInstructors(onUpdate: (instructors: InstructorProfile
 }
 
 /**
+ * Real-time subscription to pending instructor approval requests
+ */
+export function subscribeToPendingInstructors(onUpdate: (instructors: InstructorProfile[]) => void) {
+  const col = collection(db, 'pendingInstructors');
+  return onSnapshot(
+    col,
+    (snapshot) => {
+      const instructors: InstructorProfile[] = [];
+      snapshot.forEach((docSnap) => {
+        instructors.push(docSnap.data() as InstructorProfile);
+      });
+      onUpdate(instructors);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'pendingInstructors');
+    }
+  );
+}
+
+/**
+ * Save a pending instructor registration to Firestore awaiting admin approval
+ */
+export async function savePendingInstructorToCloud(instructor: InstructorProfile): Promise<void> {
+  try {
+    const safeDocId = encodeURIComponent(instructor.email.toLowerCase());
+    await setDoc(doc(db, 'pendingInstructors', safeDocId), { ...instructor, status: 'pending', isApproved: false });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `pendingInstructors/${instructor.email}`);
+    throw error;
+  }
+}
+
+/**
+ * Delete or remove a pending instructor request from Firestore
+ */
+export async function deletePendingInstructorFromCloud(email: string): Promise<void> {
+  try {
+    const safeDocId = encodeURIComponent(email.toLowerCase());
+    await deleteDoc(doc(db, 'pendingInstructors', safeDocId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `pendingInstructors/${email}`);
+    throw error;
+  }
+}
+
+/**
  * Save a registered instructor to Firestore
  */
 export async function saveInstructorToCloud(instructor: InstructorProfile): Promise<void> {
   try {
     const safeDocId = encodeURIComponent(instructor.email.toLowerCase());
-    await setDoc(doc(db, 'instructors', safeDocId), instructor);
+    await setDoc(doc(db, 'instructors', safeDocId), { ...instructor, isApproved: true, status: 'approved' });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'instructors');
     throw error;
@@ -250,6 +342,56 @@ export async function deleteInstructorFromCloud(email: string): Promise<void> {
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `instructors/${email}`);
     throw error;
+  }
+}
+
+/**
+ * Real-time subscription to student learning progress (cross-device sync)
+ */
+export function subscribeToStudentProgress(
+  email: string,
+  onUpdate: (progressMap: Record<string, any>) => void
+) {
+  if (!email) return () => {};
+  const safeDocId = encodeURIComponent(email.toLowerCase().trim());
+  const progressDoc = doc(db, 'studentProgress', safeDocId);
+  return onSnapshot(
+    progressDoc,
+    (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && data.progressMap) {
+          onUpdate(data.progressMap);
+        }
+      }
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.GET, `studentProgress/${email}`);
+    }
+  );
+}
+
+/**
+ * Save student learning progress to Firestore for instant mobile <-> laptop sync
+ */
+export async function saveStudentProgressToCloud(
+  email: string,
+  progressMap: Record<string, any>
+): Promise<void> {
+  if (!email) return;
+  try {
+    const safeDocId = encodeURIComponent(email.toLowerCase().trim());
+    await setDoc(
+      doc(db, 'studentProgress', safeDocId),
+      {
+        email: email.toLowerCase().trim(),
+        progressMap,
+        updatedAt: new Date().toISOString()
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `studentProgress/${email}`);
   }
 }
 

@@ -101,6 +101,8 @@ export interface StudentProfile {
   country?: string;
   jobTitleOrGoal?: string;
   registeredAt: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  isApproved?: boolean;
 }
 
 export interface InstructorProfile {
@@ -111,6 +113,8 @@ export interface InstructorProfile {
   bio?: string;
   specialization?: string;
   registeredAt: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  isApproved?: boolean;
 }
 
 export interface UserProgress {

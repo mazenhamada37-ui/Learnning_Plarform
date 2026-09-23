@@ -22,10 +22,13 @@ import {
   Check, 
   X, 
   RefreshCw,
-  Video
+  Video,
+  Lock,
+  AlertTriangle
 } from 'lucide-react';
 import { Course, Lesson, UserProgress, CourseReview, StudentProfile } from '../types';
 import { CourseReviewsSection } from './CourseReviewsSection';
+import { LessonSessionQuiz } from './LessonSessionQuiz';
 
 interface CoursePlayerProps {
   course: Course;
@@ -73,7 +76,8 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({
 
   const initialLesson = allLessons.find(l => !completedLessonIds.includes(l.id)) || allLessons[0];
   const [selectedLesson, setSelectedLesson] = useState<Lesson>(initialLesson || allLessons[0]);
-  const [activeTab, setActiveTab] = useState<'notes' | 'aiAsk' | 'resources' | 'reviews'>('notes');
+  const [activeTab, setActiveTab] = useState<'notes' | 'quiz' | 'aiAsk' | 'resources' | 'reviews'>('notes');
+  const [showLockedExamNotice, setShowLockedExamNotice] = useState<boolean>(false);
   const [justCompletedLessonPrompt, setJustCompletedLessonPrompt] = useState<boolean>(false);
   const [openModuleIds, setOpenModuleIds] = useState<Record<string, boolean>>({
     [course.modules[0]?.id || 'mod-1']: true
@@ -242,13 +246,30 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({
           )}
 
           {course.quiz && (
-            <button
-              onClick={() => onOpenQuiz(course)}
-              className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/20 transition-all"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>الاختبار النهائي للدورة</span>
-            </button>
+            isCourseComplete ? (
+              <button
+                type="button"
+                onClick={() => onOpenQuiz(course)}
+                className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-amber-600 hover:brightness-110 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-600/30 transition-all cursor-pointer animate-pulse"
+                title="الامتحان الشامل النهائي متاح الآن! اضغط للبدء وإصدار شهادتك"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>الامتحان الشامل النهائي (متاح الآن 🔓)</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowLockedExamNotice(true)}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800/90 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/80 font-bold text-xs sm:text-sm border border-slate-300 dark:border-slate-700 transition-all cursor-pointer"
+                title="الامتحان الشامل مقفل - يجب إكمال جميع الدروس أولاً لفتحه"
+              >
+                <Lock className="w-4 h-4 text-amber-500" />
+                <span>الامتحان الشامل (مغلق 🔒)</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-normal">
+                  {completedLessonIds.length}/{allLessons.length}
+                </span>
+              </button>
+            )
           )}
         </div>
       </div>
@@ -499,6 +520,22 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({
               </button>
 
               <button
+                type="button"
+                onClick={() => setActiveTab('quiz')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 ${
+                  activeTab === 'quiz'
+                    ? 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800 font-extrabold'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                <HelpCircle className="w-4 h-4 text-amber-500" />
+                <span>اختبار السيشن / الدرس</span>
+                {isLessonDone(selectedLesson.id) && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                )}
+              </button>
+
+              <button
                 onClick={() => setActiveTab('aiAsk')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 ${
                   activeTab === 'aiAsk'
@@ -558,7 +595,29 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({
                     </ul>
                   </div>
                 )}
+
+                {/* Quick Link to Session Quiz */}
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('quiz')}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer"
+                  >
+                    <HelpCircle className="w-4 h-4 text-slate-950" />
+                    <span>الانتقال لاختبار هذا الدرس (السيشن) 📝</span>
+                  </button>
+                </div>
               </div>
+            )}
+
+            {/* Tab: Lesson Session Quiz */}
+            {activeTab === 'quiz' && (
+              <LessonSessionQuiz
+                key={selectedLesson.id}
+                lesson={selectedLesson}
+                isCompleted={isLessonDone(selectedLesson.id)}
+                onMarkLessonComplete={() => onToggleLessonComplete(selectedLesson.id)}
+              />
             )}
 
             {/* Tab 2: Ask AI Tutor about this lesson */}
@@ -931,6 +990,59 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({
                 className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all"
               >
                 إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Locked Final Exam Notice Modal */}
+      {showLockedExamNotice && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 font-arabic" dir="rtl">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-amber-300/80 dark:border-amber-800/80 shadow-2xl space-y-5 animate-fade-in">
+            <div className="w-16 h-16 rounded-3xl bg-amber-500/15 text-amber-500 flex items-center justify-center mx-auto border border-amber-500/30">
+              <Lock className="w-8 h-8" />
+            </div>
+
+            <div className="text-center space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold border border-amber-500/30">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>الامتحان الشامل النهائي مقفل حالياً</span>
+              </div>
+              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                يجب إكمال جميع دروس الدورة أولاً! 🎓
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                وفقاً لضوابط الدورة المعتمدة، لا يمكن فتح الامتحان الشامل النهائي أو إصدار الشهادة إلا بعد حضور وإتمام كافة الدروس التعليمية في المنهج.
+              </p>
+            </div>
+
+            {/* Progress status */}
+            <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-slate-700 dark:text-slate-300">نسبة التقدم الحالية في الدورة:</span>
+                <span className="text-emerald-600 dark:text-emerald-400">
+                  {completedLessonIds.length} من {allLessons.length} دروس مكتملة
+                </span>
+              </div>
+              <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-300"
+                  style={{ width: `${allLessons.length > 0 ? (completedLessonIds.length / allLessons.length) * 100 : 0}%` }}
+                />
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                متبقي لديك ({allLessons.length - completedLessonIds.length}) دروس لإتمامها وفتح الامتحان النهائي تلقائياً!
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowLockedExamNotice(false)}
+                className="w-full py-3 rounded-2xl bg-slate-900 text-white dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 font-bold text-xs sm:text-sm transition-all shadow-md cursor-pointer"
+              >
+                فهمت، العودة لمتابعة الدروس 📚
               </button>
             </div>
           </div>
