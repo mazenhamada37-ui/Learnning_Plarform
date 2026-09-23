@@ -104,7 +104,7 @@ export const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Compute matched/relevant courses for dropdown with accurate relevance ranking
+  // Compute matched/relevant courses for dropdown
   const matchedCourses = React.useMemo(() => {
     if (!searchQuery.trim() || !courses.length) return [];
     return courses
@@ -115,10 +115,9 @@ export const Header: React.FC<HeaderProps> = ({
       .filter(item => item.score > 0)
       .sort((a, b) => b.score - a.score)
       .map(item => item.course)
-      .slice(0, 6); // Top 6 most relevant
+      .slice(0, 6);
   }, [searchQuery, courses]);
 
-  // Smooth scroll down to catalog section on Enter
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       setIsSearchFocused(false);
@@ -138,7 +137,6 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // When clicking a course from the search dropdown
   const handleSelectDropdownCourse = (course: Course) => {
     setIsSearchFocused(false);
     if (onSelectCourse) {
@@ -150,13 +148,11 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // Dynamic display name based on active role
   const studentDisplayName = studentProfile?.fullName || userName || 'Mazen Hamada';
   const instructorDisplayName = instructorProfile?.fullName || 'أستاذ محاضر';
   const isStudentActive = currentRole === 'student';
   const isInstructorActive = currentRole === 'instructor' || currentRole === 'teacher';
 
-  // 1. Switch to student
   const handleSwitchToStudent = () => {
     if (onRoleChange) onRoleChange('student');
     if (setActiveTab) setActiveTab('catalog');
@@ -164,7 +160,6 @@ export const Header: React.FC<HeaderProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 2. Switch to instructor
   const handleSwitchToInstructor = () => {
     if (onRoleChange) onRoleChange('instructor');
     if (setActiveTab) setActiveTab('instructor');
@@ -175,7 +170,6 @@ export const Header: React.FC<HeaderProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 3. Add account (+)
   const handleAddAccount = () => {
     setMobileMenuOpen(false);
     if (onOpenAddUserModal) {
@@ -187,7 +181,6 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // 4. User profile (Student or Instructor depending on active role)
   const handleUserProfile = () => {
     setMobileMenuOpen(false);
     if (isInstructorActive) {
@@ -205,7 +198,6 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // 5. Smart AI Tutor (المعلم الذكي)
   const handleAiTutor = () => {
     setMobileMenuOpen(false);
     if (onOpenAiTutor) {
@@ -213,7 +205,6 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // 6. Admin (المسؤول)
   const handleAdmin = () => {
     setMobileMenuOpen(false);
     if (onOpenAdminModal) {
@@ -223,7 +214,6 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // 7. Course Catalog (كتالوج الدورات)
   const handleCatalog = () => {
     setMobileMenuOpen(false);
     if (setActiveTab) setActiveTab('catalog');
@@ -237,7 +227,6 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // 8. Dashboard & Certificates (لوحتي وشهادتي)
   const handleDashboard = () => {
     setMobileMenuOpen(false);
     if (setActiveTab) setActiveTab('dashboard');
@@ -246,14 +235,12 @@ export const Header: React.FC<HeaderProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Instructor Studio Tab Handler
   const handleInstructorStudio = () => {
     setMobileMenuOpen(false);
     if (setActiveTab) setActiveTab('instructor');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 9. Search handler
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     if (setSearchQuery) setSearchQuery(val);
@@ -269,13 +256,11 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="w-full px-3 md:px-5 h-16 flex items-center justify-between gap-3">
         
         {/* ========================================================= */}
-        {/* DESKTOP VIEW (Visible on Screens >= md)                   */}
+        {/* DESKTOP VIEW (ظاهر فقط على شاشات اللابتوب الكبيرة 2xl)    */}
         {/* ========================================================= */}
-        <div className="hidden md:flex items-center gap-2 lg:gap-3 flex-1 min-w-0">
-          
-          {/* Action Buttons Group (Navigation & Roles) */}
+        <div className="hidden 2xl:flex items-center gap-2 lg:gap-3 flex-1 min-w-0">
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* 1. Student / Instructor Toggle */}
+            {/* Student / Instructor Toggle */}
             <div className="flex bg-[#121929] p-0.5 sm:p-1 rounded-xl border border-slate-800/80 shrink-0">
               <button
                 type="button"
@@ -303,26 +288,26 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             </div>
 
-            {/* 2. Add Account Button (+) */}
+            {/* Add Account Button */}
             <button
               type="button"
               id="header-btn-add-account"
               onClick={handleAddAccount}
               className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-amber-500 hover:brightness-105 active:scale-95 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer shrink-0 whitespace-nowrap"
-              title="إضافة حساب جديد (طالب أو محاضر)"
+              title="إضافة حساب جديد"
             >
               <span>إضافة حساب</span>
               <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />
             </button>
 
-            {/* 3. Role-Specific User Profile Button */}
+            {/* User Profile Button */}
             {isInstructorActive ? (
               <button
                 type="button"
                 id="header-btn-instructor-profile"
                 onClick={handleUserProfile}
                 className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-[#2b1704] border border-amber-500/60 text-amber-300 hover:bg-[#3d2006] hover:border-amber-400 active:scale-95 text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap"
-                title="بيانات وحساب المحاضر"
+                title="بيانات المحاضر"
               >
                 <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
                 <span className="max-w-[130px] truncate">{instructorDisplayName}</span>
@@ -333,40 +318,39 @@ export const Header: React.FC<HeaderProps> = ({
                 id="header-btn-user-profile"
                 onClick={handleUserProfile}
                 className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-[#092220] border border-emerald-500/50 text-emerald-400 hover:bg-[#0d2d2a] hover:border-emerald-400 active:scale-95 text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap"
-                title="بيانات وحساب الطالب"
+                title="بيانات الطالب"
               >
                 <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
                 <span className="max-w-[130px] truncate">{studentDisplayName}</span>
               </button>
             )}
 
-            {/* 4. Smart AI Tutor (المعلم الذكي) */}
+            {/* Smart AI Tutor */}
             <button
               type="button"
               id="header-btn-ai-tutor"
               onClick={handleAiTutor}
               className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#092225] border border-emerald-500/40 text-emerald-400 hover:bg-[#0d2d31] hover:border-emerald-400 active:scale-95 text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap"
-              title="المعلم الذكي والمساعد الافتراضي"
+              title="المعلم الذكي"
             >
               <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
               <span>المعلم الذكي</span>
             </button>
 
-            {/* 5. Admin / Platform Owner (المسؤول) */}
+            {/* Admin / Owner */}
             <button
               type="button"
               id="header-btn-admin"
               onClick={handleAdmin}
               className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#280c3a] border border-purple-500/50 text-purple-300 hover:bg-[#34114d] hover:border-purple-400 active:scale-95 text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap"
-              title="لوحة تحكم المسؤول ومالك المنصة"
+              title="لوحة تحكم المسؤول"
             >
               <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400 shrink-0" />
               <span>المسؤول</span>
             </button>
 
-            {/* 6 & 7. Role-Specific Navigation Buttons */}
+            {/* Role Navigation */}
             {isInstructorActive ? (
-              /* Instructor Navigation: استوديو المحاضر */
               <button
                 type="button"
                 id="header-btn-instructor-studio"
@@ -374,15 +358,13 @@ export const Header: React.FC<HeaderProps> = ({
                 className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                   activeTab === 'instructor'
                     ? 'bg-amber-950/80 border-amber-500/70 text-amber-300 shadow-sm'
-                    : 'bg-[#121929] border-slate-700/80 text-amber-400 hover:bg-[#1a233a] hover:border-amber-500/50'
+                    : 'bg-[#121929] border-slate-700/80 text-amber-400 hover:bg-[#1a233a]'
                 }`}
-                title="لوحة تحكم وإدارة دورات المحاضر"
               >
                 <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
                 <span>استوديو المحاضر</span>
               </button>
             ) : (
-              /* Student Navigation: كتالوج الدورات + لوحتي وشهادتي */
               <>
                 <button
                   type="button"
@@ -391,9 +373,8 @@ export const Header: React.FC<HeaderProps> = ({
                   className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                     activeTab === 'catalog'
                       ? 'bg-[#0d1f35] border-emerald-500/70 text-emerald-300 shadow-sm'
-                      : 'bg-[#0d1627] border-slate-700/80 text-emerald-400 hover:bg-[#131f37] hover:border-emerald-500/50'
+                      : 'bg-[#0d1627] border-slate-700/80 text-emerald-400 hover:bg-[#131f37]'
                   }`}
-                  title="تصفح جميع الدورات والمناهج"
                 >
                   <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
                   <span>كتالوج الدورات</span>
@@ -406,9 +387,8 @@ export const Header: React.FC<HeaderProps> = ({
                   className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                     activeTab === 'dashboard'
                       ? 'bg-[#0d1f35] border-amber-500/70 text-amber-300 shadow-sm'
-                      : 'bg-[#0d1627] border-slate-700/80 text-slate-300 hover:bg-[#131f37] hover:text-white hover:border-slate-600'
+                      : 'bg-[#0d1627] border-slate-700/80 text-slate-300 hover:bg-[#131f37] hover:text-white'
                   }`}
-                  title="لوحة الطالب ومتابعة التقدم والشهادات"
                 >
                   <Ribbon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 shrink-0" />
                   <span>لوحتي وشهادتي</span>
@@ -416,15 +396,12 @@ export const Header: React.FC<HeaderProps> = ({
               </>
             )}
           </div>
-
         </div>
 
         {/* ========================================================= */}
-        {/* MOBILE COMPACT CONTROLS (< md screens)                    */}
-        {/* Shows Three Lines Menu Button (تلات شرط)                  */}
+        {/* MOBILE / TABLET / SPLIT-SCREEN HAMBURGER BUTTON (< 2xl)    */}
         {/* ========================================================= */}
-        <div className="flex md:hidden items-center gap-2">
-          {/* Three Lines Menu Toggle Button (زر التلات شرط) */}
+        <div className="flex 2xl:hidden items-center gap-2">
           <button
             type="button"
             id="header-mobile-hamburger-btn"
@@ -441,7 +418,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
 
-        {/* Platform Brand (Left Side) */}
+        {/* Platform Brand Logo */}
         <div 
           onClick={handleCatalog}
           className="flex items-center gap-2 shrink-0 pl-1 cursor-pointer select-none"
@@ -450,7 +427,7 @@ export const Header: React.FC<HeaderProps> = ({
             الذكية
           </span>
           <span className="font-extrabold text-white text-sm sm:text-base tracking-tight flex items-center gap-1 whitespace-nowrap">
-            منصة <span className="text-emerald-400">تعلَّم</span>
+            منصة <span className="text-emerald-400">تعلَّم</span>
           </span>
           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-bold shadow-md shrink-0">
             <BookOpen className="w-4 h-4" />
@@ -459,13 +436,9 @@ export const Header: React.FC<HeaderProps> = ({
 
       </div>
 
-      {/* ========================================================= */}
-      {/* DEDICATED FULL-WIDTH SEARCH ROW (سطر كامل مخصص للبحث بتصميم متقن وعصري) */}
-      {/* ========================================================= */}
+      {/* DEDICATED SEARCH ROW */}
       <div className="w-full bg-[#080d19]/95 backdrop-blur-md border-t border-slate-800/80 px-3 sm:px-5 py-2.5 shadow-sm">
         <div ref={searchContainerRef} className="relative w-full max-w-5xl mx-auto">
-          
-          {/* Outer Search Bar Container */}
           <div 
             className={`relative flex items-center w-full rounded-2xl transition-all duration-200 border ${
               isSearchFocused
@@ -473,14 +446,12 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'bg-[#0c1322] border-slate-750 hover:border-slate-600 shadow-inner'
             }`}
           >
-            {/* Search Icon with Glowing Subtle State */}
             <div className="pr-3.5 pl-1 flex items-center justify-center shrink-0 pointer-events-none">
               <Search className={`w-4 h-4 sm:w-4.5 sm:h-4.5 transition-colors duration-200 ${
                 isSearchFocused ? 'text-emerald-400' : 'text-slate-400'
               }`} />
             </div>
 
-            {/* Main Search Input */}
             <input
               type="text"
               id="header-search-input"
@@ -492,7 +463,6 @@ export const Header: React.FC<HeaderProps> = ({
               className="w-full h-10 sm:h-11 bg-transparent text-sm text-slate-100 placeholder-slate-400/80 focus:outline-none pr-1 pl-2 font-normal"
             />
 
-            {/* Trailing Controls (Clear + Enter Button) */}
             <div className="pl-2 pr-1.5 flex items-center gap-1.5 shrink-0">
               {searchQuery && (
                 <button
@@ -509,7 +479,6 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
 
-              {/* Instant Search / Go to Catalog Button */}
               <button
                 type="button"
                 onClick={() => {
@@ -532,7 +501,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Quick topic tags row under the search bar for instant filtering */}
+          {/* Quick topic tags */}
           <div className="hidden sm:flex items-center gap-1.5 pt-1.5 px-1 text-[11px] text-slate-400 overflow-x-auto no-scrollbar">
             <span className="shrink-0 text-slate-400 flex items-center gap-1">
               <Sparkles className="w-3 h-3 text-emerald-400" />
@@ -572,7 +541,6 @@ export const Header: React.FC<HeaderProps> = ({
               className="absolute top-full mt-2 right-0 left-0 bg-[#0d1627]/98 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in"
               dir="rtl"
             >
-              {/* Header inside dropdown */}
               <div className="p-3 border-b border-slate-800/80 flex items-center justify-between text-xs text-slate-400 bg-[#090f1d]/90">
                 <span className="font-bold flex items-center gap-1.5 text-emerald-400">
                   <Sparkles className="w-4 h-4" />
@@ -615,11 +583,10 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               ) : (
                 <div className="p-6 text-center text-xs text-slate-400">
-                  لا توجد نتائج مطابقة مباشرة لـ &ldquo;{searchQuery}&rdquo;، اضغط <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-slate-300 font-mono text-xs">Enter ↵</kbd> للبحث الشامل في الكتالوج
+                  لا توجد نتائج مطابقة مباشرة لـ &ldquo;{searchQuery}&rdquo;
                 </div>
               )}
 
-              {/* Quick Scroll-Down Footer Button */}
               <button
                 type="button"
                 onClick={() => {
@@ -639,13 +606,10 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* ========================================================= */}
-      {/* MOBILE EXPANDED DRAWER MENU (عند فتح التلات شرط للشاشات الصغيرة فقط) */}
-      {/* ========================================================= */}
+      {/* MOBILE / TABLET / SPLIT-SCREEN DRAWER MENU (< 2xl) */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-800/90 bg-[#090d16]/98 backdrop-blur-md px-4 py-4 space-y-3 animate-fade-in shadow-2xl">
-          
-          {/* 1. Active Role Switcher (طالب | محاضر) */}
+        <div className="2xl:hidden border-t border-slate-800/90 bg-[#090d16]/98 backdrop-blur-md px-4 py-4 space-y-3 animate-fade-in shadow-2xl">
+          {/* Active Role Switcher */}
           <div className="flex bg-[#121929] p-1 rounded-xl border border-slate-800 w-full">
             <button
               type="button"
@@ -671,7 +635,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* 2. User Profile Card */}
+          {/* User Profile Card */}
           <div 
             onClick={handleUserProfile}
             className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
@@ -704,33 +668,50 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </div>
 
-          {/* 3. Action Grid according to Role */}
+          {/* Drawer Actions */}
           <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              type="button"
+              onClick={handleAddAccount}
+              className="col-span-2 p-2.5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-amber-500 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>إضافة حساب جديد</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleAiTutor}
+              className="p-2.5 rounded-xl bg-[#092225] border border-emerald-500/40 text-emerald-400 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Bot className="w-4 h-4 text-emerald-400" />
+              <span>المعلم الذكي</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleAdmin}
+              className="p-2.5 rounded-xl bg-[#280c3a] border border-purple-500/50 text-purple-300 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4 text-purple-400" />
+              <span>المسؤول</span>
+            </button>
+
             {isInstructorActive ? (
-              /* Instructor Studio Quick Link */
               <button
                 type="button"
                 onClick={handleInstructorStudio}
-                className={`col-span-2 p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 justify-center transition-all ${
-                  activeTab === 'instructor'
-                    ? 'bg-amber-950/80 border-amber-500/70 text-amber-300'
-                    : 'bg-[#121929] border-slate-700/80 text-amber-400 hover:bg-[#1a233a]'
-                }`}
+                className="col-span-2 p-2.5 rounded-xl bg-amber-950/80 border border-amber-500/70 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
               >
                 <BookOpen className="w-4 h-4 text-amber-400" />
-                <span>استوديو المحاضر (إدارة وتعديل الكورسات)</span>
+                <span>استوديو المحاضر</span>
               </button>
             ) : (
-              /* Student Catalog & Dashboard */
               <>
                 <button
                   type="button"
                   onClick={handleCatalog}
-                  className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 justify-center transition-all ${
-                    activeTab === 'catalog'
-                      ? 'bg-[#0d1f35] border-emerald-500/70 text-emerald-300'
-                      : 'bg-[#0d1627] border-slate-700/80 text-emerald-400 hover:bg-[#131f37]'
-                  }`}
+                  className="p-2.5 rounded-xl bg-[#0d1f35] border border-emerald-500/70 text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <BookOpen className="w-4 h-4 text-emerald-400" />
                   <span>كتالوج الدورات</span>
@@ -739,52 +720,16 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={handleDashboard}
-                  className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 justify-center transition-all ${
-                    activeTab === 'dashboard'
-                      ? 'bg-[#0d1f35] border-amber-500/70 text-amber-300'
-                      : 'bg-[#0d1627] border-slate-700/80 text-slate-300 hover:bg-[#131f37]'
-                  }`}
+                  className="p-2.5 rounded-xl bg-[#0d1627] border border-slate-700/80 text-slate-300 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Ribbon className="w-4 h-4 text-slate-400" />
                   <span>لوحتي وشهادتي</span>
                 </button>
               </>
             )}
-
-            {/* Smart AI Tutor */}
-            <button
-              type="button"
-              onClick={handleAiTutor}
-              className="p-2.5 rounded-xl bg-[#092225] border border-emerald-500/40 text-emerald-400 text-xs font-bold flex items-center gap-1.5 justify-center hover:bg-[#0d2d31] transition-all"
-            >
-              <Bot className="w-4 h-4 text-emerald-400" />
-              <span>المعلم الذكي</span>
-            </button>
-
-            {/* Admin */}
-            <button
-              type="button"
-              onClick={handleAdmin}
-              className="p-2.5 rounded-xl bg-[#280c3a] border border-purple-500/50 text-purple-300 text-xs font-bold flex items-center gap-1.5 justify-center hover:bg-[#34114d] transition-all"
-            >
-              <ShieldCheck className="w-4 h-4 text-purple-400" />
-              <span>المسؤول</span>
-            </button>
           </div>
-
-          {/* 4. Add Account Button */}
-          <button
-            type="button"
-            onClick={handleAddAccount}
-            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-amber-500 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition-all"
-          >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>إضافة حساب جديد (طالب أو محاضر)</span>
-          </button>
-
         </div>
       )}
-
     </header>
   );
 };
