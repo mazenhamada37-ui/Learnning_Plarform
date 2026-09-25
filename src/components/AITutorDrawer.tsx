@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { GoogleGenAI, Chat } from '@google/genai';
 import { Bot, Send, User, X, Loader2, BookOpen } from 'lucide-react';
 import { StudentProfile, Course } from '../types';
 
@@ -11,20 +12,18 @@ interface AiTutorModalProps {
   onSelectCourse?: (courseId: string) => void;
 }
 
-interface CourseRecommendation {
-  title: string;
-  description: string;
-  topics: string[];
-}
-
 interface Message {
   id: string;
   sender: 'bot' | 'user';
   text: string;
   time: string;
   matchedCourses?: Course[];
-  generatedRecommendation?: CourseRecommendation;
 }
+
+// عميل Gemini - المفتاح بيتقرأ تلقائيًا من بيئة AI Studio
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+
+const nowTime = () => new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
 
 export const AiTutorModal: React.FC<AiTutorModalProps> = ({
   isOpen,
@@ -37,13 +36,37 @@ export const AiTutorModal: React.FC<AiTutorModalProps> = ({
     {
       id: '1',
       sender: 'bot',
-      text: `أهلاً بك${studentProfile?.fullName ? ' يا ' + studentProfile.fullName : ''}! أنا معلمك الذكي 🤖\nاطلب مني أي كورس أو مجال تحب تتستفسر عنه أو تتعلمه، وسأشرح لك محتواه فوراً وأوفر لك مسار التعلم المناسب.`,
-      time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+      text: `أهلاً بك${studentProfile?.fullName ? ' يا ' + studentProfile.fullName : ''}! أنا معلمك الذكي 🤖\nاسألني عن أي حاجة - أي مادة، أي سؤال، أو حتى لو عايز اقتراح كورس - وهساعدك فورًا.`,
+      time: nowTime(),
     },
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatRef = useRef<Chat | null>(null);
+
+  // إنشاء جلسة شات واحدة تحتفظ بسياق المحادثة طول ما المودال مفتوح
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const coursesSummary = courses
+      .slice(0, 40)
+      .map((c) => `- ${c.title}${c.category ? ` (${c.category})` : ''}`)
+      .join('\n');
+
+    chatRef.current = ai.chats.create({
+      model: 'gemini-2.5-flash',
+      config: {
+        systemInstruction: `أنت "المعلم الذكي"، مساعد ذكاء اصطناعي داخل منصة تعليمية عربية اسمها "تعلَّم".
+مهمتك: الرد على أي سؤال يطرحه الطالب مهما كان موضوعه (تعليمي، تقني، عام، أو حتى محادثة عادية)، بنفس اللغة أو اللهجة اللي بيكتب بيها.
+كن مفيدًا، دقيقًا، وواضحًا، وقدم شرحًا عمليًا مع أمثلة عند الحاجة.
+لو الطالب سأل عن كورس أو موضوع تعليمي، ولاحظت إن فيه كورس متاح في القائمة دي مرتبط بسؤاله، اذكر اسمه واقترح عليه يفتحه:
+${coursesSummary || 'لا توجد كورسات متاحة حاليًا.'}
+لو مفيش كورس مطابق في القائمة، رد على السؤال بشكل كامل من معرفتك العامة من غير ما تخترع كورس مش موجود فعليًا في القائمة.`,
+      },
+    });
+  }, [isOpen]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,79 +74,67 @@ export const AiTutorModal: React.FC<AiTutorModalProps> = ({
 
   if (!isOpen) return null;
 
-  const generateSmartCourseReply = (query: string): { text: string; recommendation?: CourseRecommendation } => {
-    const cleanQuery = query.toLowerCase().trim();
-
-    return {
-      text: `بالتأكيد! كورس "${query}" من أهم المسارات المطلوبة حالياً. إليك نظرة شاملة على ما ستتعلمه في هذا المسار:`,
-      recommendation: {
-        title: `دورة ${query} الشاملة`,
-        description: `مسار تعليمي يتضمن التطبيق العملي والمشاريع الحقيقية في مجال ${query}.`,
-        topics: [
-          `أساسيات ومفاهيم ${query}`,
-          `الأدوات والتقنيات الحديثة المستعملة`,
-          `بناء مشاريع علمية وتطبيقية`,
-          `إعدادك لسوق العمل والمقابلات الشخصية`
-        ]
-      }
-    };
+  const findMatchingCourses = (query: string): Course[] => {
+    const cleanQuery = query.toLowerCase().replace(/[أإآ]/g, 'ا');
+    return courses.filter((c) => {
+      const title = (c.title || '').toLowerCase().replace(/[أإآ]/g, 'ا');
+      const desc = (c.description || '').toLowerCase().replace(/[أإآ]/g, 'ا');
+      const cat = (c.category || '').toLowerCase().replace(/[أإآ]/g, 'ا');
+      return title.includes(cleanQuery) || desc.includes(cleanQuery) || cat.includes(cleanQuery);
+    });
   };
 
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string) => {
     const query = (textToSend || inputText).trim();
-    if (!query || isLoading) return;
+    if (!query || isLoading || !chatRef.current) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
       sender: 'user',
       text: query,
-      time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+      time: nowTime(),
     };
 
     setMessages((prev) => [...prev, userMsg]);
     if (!textToSend) setInputText('');
     setIsLoading(true);
+    setError('');
 
-    setTimeout(() => {
-      const cleanQuery = query.toLowerCase().replace(/[أإآ]/g, 'ا');
+    try {
+      const response = await chatRef.current.sendMessage({ message: query });
+      const replyText = response.text || 'عذرًا، لم أتمكن من إيجاد رد مناسب. حاول تصيغ سؤالك بشكل مختلف.';
 
-      const foundCourses = courses.filter((c) => {
-        const title = (c.title || '').toLowerCase().replace(/[أإآ]/g, 'ا');
-        const desc = (c.description || '').toLowerCase().replace(/[أإآ]/g, 'ا');
-        const cat = (c.category || '').toLowerCase().replace(/[أإآ]/g, 'ا');
-        return title.includes(cleanQuery) || desc.includes(cleanQuery) || cat.includes(cleanQuery);
-      });
+      const foundCourses = findMatchingCourses(query);
 
-      let botMsg: Message;
-
-      if (foundCourses.length > 0) {
-        botMsg = {
-          id: (Date.now() + 1).toString(),
-          sender: 'bot',
-          text: `ممتاز! وجدنا لك الكورسات التالية المسجلة بالمنصة والمخصصة لـ "${query}":`,
-          time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
-          matchedCourses: foundCourses,
-        };
-      } else {
-        const smartResult = generateSmartCourseReply(query);
-        botMsg = {
-          id: (Date.now() + 1).toString(),
-          sender: 'bot',
-          text: smartResult.text,
-          time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
-          generatedRecommendation: smartResult.recommendation,
-        };
-      }
+      const botMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        sender: 'bot',
+        text: replyText,
+        time: nowTime(),
+        matchedCourses: foundCourses.length > 0 ? foundCourses : undefined,
+      };
 
       setMessages((prev) => [...prev, botMsg]);
+    } catch (err: any) {
+      console.error('Gemini API error:', err);
+      setError('حدث خطأ أثناء التواصل مع المساعد الذكي. تأكد من اتصالك بالإنترنت وحاول مرة أخرى.');
+      const botMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        sender: 'bot',
+        text: 'عذرًا، حدث خطأ أثناء محاولة الرد على سؤالك. حاول مرة أخرى بعد قليل.',
+        time: nowTime(),
+      };
+      setMessages((prev) => [...prev, botMsg]);
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-arabic" dir="rtl">
       <div className="bg-[#0b132b] border border-slate-700 rounded-2xl w-full max-w-lg h-[80vh] flex flex-col shadow-2xl overflow-hidden">
         
+        {/* Header */}
         <div className="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
@@ -131,7 +142,7 @@ export const AiTutorModal: React.FC<AiTutorModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-white text-sm">المعلم الذكي (EduBot)</h3>
-              <p className="text-[11px] text-slate-400">مساعدك التعليمي التفاعلي لكل المجالات</p>
+              <p className="text-[11px] text-slate-400">مساعدك التعليمي المدعوم بالذكاء الاصطناعي</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer">
@@ -139,6 +150,7 @@ export const AiTutorModal: React.FC<AiTutorModalProps> = ({
           </button>
         </div>
 
+        {/* Messages Body */}
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
           {messages.map((msg) => (
             <div key={msg.id} className={`flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -178,24 +190,6 @@ export const AiTutorModal: React.FC<AiTutorModalProps> = ({
                   </div>
                 )}
 
-                {msg.generatedRecommendation && (
-                  <div className="mt-3 p-3 bg-slate-900/90 border border-emerald-500/30 rounded-xl space-y-2">
-                    <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
-                      <BookOpen className="w-4 h-4" />
-                      <span>{msg.generatedRecommendation.title}</span>
-                    </div>
-                    <p className="text-[11px] text-slate-300">{msg.generatedRecommendation.description}</p>
-                    <div className="space-y-1 pt-1 border-t border-slate-800">
-                      <p className="text-[10px] font-bold text-slate-400">أبرز المحاور:</p>
-                      <ul className="list-disc list-inside text-[11px] text-slate-300 space-y-0.5">
-                        {msg.generatedRecommendation.topics.map((topic, i) => (
-                          <li key={i}>{topic}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-
                 <span className="block text-[10px] opacity-50 mt-1 text-left">{msg.time}</span>
               </div>
             </div>
@@ -204,16 +198,24 @@ export const AiTutorModal: React.FC<AiTutorModalProps> = ({
           {isLoading && (
             <div className="flex items-center gap-2 text-slate-400 text-xs p-2">
               <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-              <span>جاري إعداد الإجابة والمحتوى...</span>
+              <span>جاري التفكير في إجابة سؤالك...</span>
             </div>
           )}
+
+          {error && (
+            <div className="text-[11px] text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-xl p-2.5">
+              {error}
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Input Form */}
         <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="p-3 bg-slate-900 border-t border-slate-800 flex gap-2">
           <input
             type="text"
-            placeholder="اكتب اسم أي كورس تريد الاستفسار عنه..."
+            placeholder="اكتب سؤالك أو استفسارك هنا..."
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"

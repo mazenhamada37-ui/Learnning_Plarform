@@ -16,96 +16,112 @@ export const AddUserTypeModal: React.FC<AddUserTypeModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  const selectStudent = () => {
+    onClose();
+    onSelectStudent();
+  };
+
+  const selectInstructor = () => {
+    onClose();
+    onSelectInstructor();
+  };
+
   return (
-    <div 
-      onClick={onClose}
-      className="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in dir-rtl flex min-h-full items-center justify-center"
+    <div
+      className="fixed inset-0 z-[100] flex min-h-full items-center justify-center overflow-y-auto bg-slate-950/75 p-3 backdrop-blur-sm sm:p-4"
+      dir="rtl"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-account-title"
+      onMouseDown={onClose}
     >
-      <div 
-        className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh] my-auto min-h-0"
-        onClick={(e) => e.stopPropagation()}
+      <div
+        className="my-auto flex max-h-[90vh] w-full max-w-md min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+        onMouseDown={(event) => event.stopPropagation()}
       >
-        {/* Header decoration banner */}
-        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-amber-600 p-4 sm:p-6 text-white relative shrink-0">
+        <div className="relative shrink-0 bg-gradient-to-r from-emerald-600 via-teal-600 to-amber-600 p-5 text-white sm:p-6">
           <button
+            type="button"
             onClick={onClose}
-            className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-            title="إغلاق"
+            className="absolute left-3.5 top-3.5 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20 sm:left-4 sm:top-4"
+            aria-label="إغلاق"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
-          
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 sm:p-3 bg-white/15 rounded-xl backdrop-blur-md shrink-0">
-              <UserPlus className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+
+          <div className="flex items-center gap-3 pl-10">
+            <div className="shrink-0 rounded-xl bg-white/15 p-3">
+              <UserPlus className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h3 className="text-lg sm:text-xl font-bold">إضافة حساب جديد ➕</h3>
-              <p className="text-[11px] sm:text-xs text-white/90 mt-0.5 font-medium">
+              <h2 id="add-account-title" className="text-lg font-bold sm:text-xl">
+                إضافة حساب جديد
+              </h2>
+              <p className="mt-1 text-xs font-medium text-white/90">
                 اختر نوع الحساب الذي ترغب في تسجيله
               </p>
             </div>
           </div>
         </div>
 
-        {/* Options Container */}
-        <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0 touch-pan-y overscroll-contain">
-          <p className="text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+          <p className="mb-4 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
             هل أنت طالب أم محاضر؟
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Student Card */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <button
-              onClick={onSelectStudent}
-              className="group flex flex-col items-center justify-between p-5 rounded-2xl border-2 border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/50 hover:bg-emerald-100/60 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/60 transition-all hover:scale-[1.02] text-right shadow-xs hover:shadow-md cursor-pointer"
+              type="button"
+              onClick={selectStudent}
+              className="group flex flex-col items-center rounded-2xl border-2 border-emerald-200 bg-emerald-50/60 p-5 text-center transition-all hover:scale-[1.02] hover:bg-emerald-100/70 hover:shadow-md dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/60"
             >
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md mb-3 group-hover:bg-emerald-600 transition-colors">
-                <GraduationCap className="w-6 h-6" />
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-md transition-colors group-hover:bg-emerald-600">
+                <GraduationCap className="h-6 w-6" />
               </div>
-              <div className="text-center">
-                <h4 className="font-bold text-slate-900 dark:text-white text-base">حساب طالب</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  حضور الكورسات والتعلم وحفظ التقدم
-                </p>
-              </div>
-              <div className="mt-4 w-full py-2 bg-emerald-600 group-hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors">
-                <span>سجل كطالب</span>
-                <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
-              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                حساب طالب
+              </h3>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                حضور الكورسات والتعلم وحفظ التقدم
+              </p>
+              <span className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2 text-xs font-bold text-white transition-colors group-hover:bg-emerald-700">
+                سجل كطالب
+                <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-1" />
+              </span>
             </button>
 
-            {/* Instructor Card */}
             <button
-              onClick={onSelectInstructor}
-              className="group flex flex-col items-center justify-between p-5 rounded-2xl border-2 border-amber-200 dark:border-amber-800/60 bg-amber-50/50 hover:bg-amber-100/60 dark:bg-amber-950/30 dark:hover:bg-amber-950/60 transition-all hover:scale-[1.02] text-right shadow-xs hover:shadow-md cursor-pointer"
+              type="button"
+              onClick={selectInstructor}
+              className="group flex flex-col items-center rounded-2xl border-2 border-amber-200 bg-amber-50/60 p-5 text-center transition-all hover:scale-[1.02] hover:bg-amber-100/70 hover:shadow-md dark:border-amber-800/60 dark:bg-amber-950/30 dark:hover:bg-amber-950/60"
             >
-              <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md mb-3 group-hover:bg-amber-600 transition-colors">
-                <Award className="w-6 h-6" />
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-md transition-colors group-hover:bg-amber-600">
+                <Award className="h-6 w-6" />
               </div>
-              <div className="text-center">
-                <h4 className="font-bold text-slate-900 dark:text-white text-base">حساب محاضر</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  إنشاء وإدارة وتحديث الكورسات للطلاب
-                </p>
-              </div>
-              <div className="mt-4 w-full py-2 bg-amber-600 group-hover:bg-amber-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors">
-                <span>سجل كمحاضر</span>
-                <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
-              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                حساب محاضر
+              </h3>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                إنشاء وإدارة وتحديث الكورسات للطلاب
+              </p>
+              <span className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl bg-amber-600 py-2 text-xs font-bold text-white transition-colors group-hover:bg-amber-700">
+                سجل كمحاضر
+                <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-1" />
+              </span>
             </button>
           </div>
 
-          <div className="pt-2 text-center">
-            <button
-              onClick={onClose}
-              className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 underline"
-            >
-              إلغاء الأمر
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-6 block w-full text-center text-xs text-slate-500 underline hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+          >
+            إلغاء الأمر
+          </button>
         </div>
       </div>
     </div>
   );
 };
+
+export default AddUserTypeModal;

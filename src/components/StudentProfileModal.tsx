@@ -27,10 +27,13 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  // Enrolled courses for this student
-  const enrolledCourses = courses.filter((c) => userProgressMap[c.id]);
-  const completedCourses = enrolledCourses.filter((c) => userProgressMap[c.id]?.isCompleted);
-  const inProgressCourses = enrolledCourses.filter((c) => !userProgressMap[c.id]?.isCompleted);
+  // Enrolled courses for this student (تم تأمين الكود ضد الـ undefined)
+  const safeCourses = courses || [];
+  const safeProgressMap = userProgressMap || {};
+  
+  const enrolledCourses = safeCourses.filter((c) => safeProgressMap[c.id]);
+  const completedCourses = enrolledCourses.filter((c) => safeProgressMap[c.id]?.isCompleted);
+  const inProgressCourses = enrolledCourses.filter((c) => !safeProgressMap[c.id]?.isCompleted);
 
   const displayName = studentProfile?.fullName || 'مازن حمادة';
   const displayEmail = studentProfile?.email || 'mazenhamada37@gmail.com';
@@ -177,8 +180,8 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
             ) : (
               <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
                 {enrolledCourses.map((course) => {
-                  const prog = userProgressMap[course.id];
-                  const totalLessons = course.modules.reduce((acc, m) => acc + m.lessons.length, 0);
+                  const prog = safeProgressMap[course.id];
+                  const totalLessons = course.modules?.reduce((acc, m) => acc + (m.lessons?.length || 0), 0) || 0;
                   const completedLessons = prog?.completedLessonIds?.length || 0;
                   const percent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
                   const isDone = prog?.isCompleted;

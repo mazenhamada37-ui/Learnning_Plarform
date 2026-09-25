@@ -1,37 +1,22 @@
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Educational platform collections allowing cross-device real-time sync
-    match /courses/{courseId} {
-      allow read, write: if true;
-    }
-    match /courseRequests/{requestId} {
-      allow read, write: if true;
-    }
-    match /students/{studentId} {
-      allow read, write: if true;
-    }
-    match /pendingStudents/{studentId} {
-      allow read, write: if true;
-    }
-    match /instructors/{instructorId} {
-      allow read, write: if true;
-    }
-    match /pendingInstructors/{instructorId} {
-      allow read, write: if true;
-    }
-    match /studentProgress/{studentId} {
-      allow read, write: if true;
-    }
-    match /platformMeta/{metaId} {
-      allow read, write: if true;
-    }
-    match /courseReviews/{reviewId} {
-      allow read, write: if true;
-    }
-    // Fallback rule for any other collection
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
-}
+import { getApp, getApps, initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+
+const firebaseConfig = {
+  projectId: 'gen-lang-client-0229681775',
+  appId: '1:34575801530:web:096a1b996a2248edaff683',
+  apiKey: 'AIzaSyBgdkDJ_U6jAUeOa6a2bl2qaaZj0c0EYVo',
+  authDomain: 'gen-lang-client-0229681775.firebaseapp.com',
+  storageBucket: 'gen-lang-client-0229681775.firebasestorage.app',
+  messagingSenderId: '34575801530',
+  measurementId: '',
+};
+
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+export const auth = getAuth(app);
+
+// The Firebase console created the default database, so do not pass a custom ID.
+export const db = getFirestore(app);
+
+export { app, firebaseConfig };

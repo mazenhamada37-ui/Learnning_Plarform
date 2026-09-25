@@ -268,7 +268,7 @@ app.post("/api/admin/send-otp", async (req, res) => {
       expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes expiry
     };
 
-    console.log(`[OTP Security] Generated OTP for ${toEmail}: ${otpCode}`);
+    console.log(`[OTP Security] OTP generated for ${toEmail} (hidden from logs for production safety)`);
 
     const htmlContent = `
       <div dir="rtl" style="font-family: Arial, 'Segoe UI', Tahoma, sans-serif; max-width: 550px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; color: #1e293b;">
@@ -379,12 +379,6 @@ app.post("/api/admin/verify-otp", (req, res) => {
   try {
     const { otp } = req.body;
     const cleanOtp = String(otp || "").trim();
-
-    // Master PIN fallback (778899)
-    if (cleanOtp === "778899") {
-      res.json({ success: true, message: "تم التحقق من الرمز بنجاح" });
-      return;
-    }
 
     if (!currentOtpRecord) {
       res.status(400).json({ error: "لم يتم طلب رمز تحقق بعد أو انتهت صلاحية الجلسة. يرجى طلب رمز جديد." });

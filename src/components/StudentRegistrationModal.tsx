@@ -1,317 +1,376 @@
-import React, { useState, useEffect } from 'react';
-import { X, UserCheck, GraduationCap, Mail, Phone, MapPin, Target, Sparkles, CheckCircle2, Clock, ShieldAlert, LogOut } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { X, UserPlus, Mail, Lock, Phone, AlertCircle, CheckCircle2, Target } from 'lucide-react';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
 import { StudentProfile } from '../types';
 
-interface StudentRegistrationModalProps {
+interface Props {
   isOpen: boolean;
   onClose: () => void;
-  studentProfile: StudentProfile | null;
-  onSaveProfile: (profile: StudentProfile) => { isPending: boolean };
+  studentProfile?: StudentProfile | null;
+  onSaveProfile: (profile: StudentProfile) => void | Promise<void>;
   onLogout?: () => void;
-  isInitialRequired?: boolean;
 }
 
-export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> = ({
-  isOpen,
-  onClose,
-  studentProfile,
-  onSaveProfile,
-  onLogout,
-  isInitialRequired = false,
-}) => {
+// قائمة شاملة بأبرز المجالات والتخصصات ليختار الطالب من بينها بدل الكتابة الحرة
+const GOAL_OPTIONS: { group: string; options: string[] }[] = [
+  {
+    group: 'البرمجة وتطوير الويب',
+    options: [
+      'تطوير الويب الشامل (Full Stack Web Development)',
+      'تطوير الواجهات الأمامية (Frontend Development)',
+      'تطوير الواجهات الخلفية (Backend Development)',
+      'تطوير تطبيقات الموبايل (Mobile Development)',
+      'هندسة البرمجيات (Software Engineering)',
+    ],
+  },
+  {
+    group: 'الذكاء الاصطناعي والبيانات',
+    options: [
+      'الذكاء الاصطناعي (Artificial Intelligence)',
+      'تعلم الآلة (Machine Learning)',
+      'علم البيانات (Data Science)',
+      'تحليل البيانات (Data Analysis)',
+      'رؤية الحاسوب (Computer Vision)',
+    ],
+  },
+  {
+    group: 'التصميم والإبداع',
+    options: [
+      'تصميم واجهات المستخدم (UI/UX Design)',
+      'الجرافيك ديزاين (Graphic Design)',
+      'الموشن جرافيك (Motion Graphics)',
+      'تصميم المنتجات (Product Design)',
+      'التصوير والمونتاج',
+    ],
+  },
+  {
+    group: 'الأعمال والتسويق',
+    options: [
+      'التسويق الرقمي (Digital Marketing)',
+      'ريادة الأعمال (Entrepreneurship)',
+      'إدارة المشاريع (Project Management)',
+      'المبيعات وخدمة العملاء',
+      'إدارة الموارد البشرية',
+    ],
+  },
+  {
+    group: 'الأمن السيبراني والشبكات',
+    options: [
+      'الأمن السيبراني (Cybersecurity)',
+      'إدارة الشبكات (Networking)',
+      'إدارة أنظمة السحابة (Cloud Computing)',
+      'اختبار الاختراق (Penetration Testing)',
+    ],
+  },
+  {
+    group: 'اللغات والتعليم',
+    options: [
+      'تعلم اللغة الإنجليزية',
+      'تعلم لغات أجنبية أخرى',
+      'التنمية الذاتية والمهارات الشخصية',
+      'إعداد المعلمين والتدريب',
+    ],
+  },
+  {
+    group: 'أخرى',
+    options: ['ما زلت أستكشف المجال المناسب لي', 'مجال آخر غير مذكور'],
+  },
+];
+
+const OTHER_GOAL_VALUE = 'مجال آخر غير مذكور';
+
+export const StudentRegistrationModal: React.FC<Props> = ({ isOpen, onClose, onSaveProfile }) => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [country, setCountry] = useState('مصر');
-  const [jobTitleOrGoal, setJobTitleOrGoal] = useState('برمجة وتطوير الويب');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [isPendingApproval, setIsPendingApproval] = useState(false);
+  const [goal, setGoal] = useState('');
+  const [customGoal, setCustomGoal] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [fieldError, setFieldError] = useState<string>(''); // اسم الحقل اللي فيه الخطأ حاليًا
+  const [success, setSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (studentProfile) {
-      setFullName(studentProfile.fullName || '');
-      setEmail(studentProfile.email || '');
-      setPhone(studentProfile.phone || '');
-      setCountry(studentProfile.country || 'مصر');
-      setJobTitleOrGoal(studentProfile.jobTitleOrGoal || 'برمجة وتطوير الويب');
-    } else {
-      setFullName('');
-      setEmail('');
-      setPhone('');
-      setCountry('مصر');
-      setJobTitleOrGoal('برمجة وتطوير الويب');
-    }
-    setErrorMsg('');
-    setIsSuccess(false);
-    setIsPendingApproval(false);
-  }, [studentProfile, isOpen]);
-
-  useEffect(() => {
-    if (isPendingApproval && isOpen) {
-      const handleWindowClick = () => {
-        onClose();
-      };
-      const timer = setTimeout(() => {
-        window.addEventListener('click', handleWindowClick);
-      }, 150);
-
-      return () => {
-        clearTimeout(timer);
-        window.removeEventListener('click', handleWindowClick);
-      };
-    }
-  }, [isPendingApproval, isOpen, onClose]);
+  const fullNameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const countryRef = useRef<HTMLInputElement>(null);
+  const goalRef = useRef<HTMLSelectElement>(null);
+  const customGoalRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const confirmPasswordRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fullName.trim() || fullName.trim().length < 3) {
-      setErrorMsg('يرجى كتابة الاسم الثلاثي الكامل ليظهر بشكل صحيح على الشهادة.');
-      return;
+  // يعرض رسالة الخطأ، يحدد اسم الحقل المسؤول عنه (للتلوين)، ويعمل focus عليه مباشرة
+  const fail = (message: string, field: string, ref: React.RefObject<HTMLInputElement | HTMLSelectElement>) => {
+    setError(message);
+    setFieldError(field);
+    ref.current?.focus();
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const fieldClass = (field: string) =>
+    `mt-1.5 w-full rounded-xl border p-3 text-sm text-white placeholder-slate-500 focus:outline-none transition-all bg-[#131b2e] ${
+      fieldError === field
+        ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/50'
+        : 'border-slate-700/80 focus:border-emerald-500'
+    }`;
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setFieldError('');
+
+    const cleanName = fullName.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phone.trim();
+    const cleanCountry = country.trim();
+
+    // الاسم: كلمتين على الأقل، حروف عربية أو إنجليزية بس (بدون أرقام أو رموز)
+    const nameWords = cleanName.split(/\s+/).filter(Boolean);
+    if (cleanName.length < 3 || nameWords.length < 2) {
+      return fail('اكتب الاسم الكامل (اسم أول واسم تاني على الأقل).', 'fullName', fullNameRef);
     }
-    if (!email.trim() || !email.includes('@')) {
-      setErrorMsg('يرجى إدخال بريد إلكتروني صحيح لتلقي الشهادات والملفات.');
-      return;
+    if (!/^[A-Za-zأ-يءآأإئؤ\s]+$/.test(cleanName)) {
+      return fail('الاسم يجب أن يحتوي على حروف فقط، بدون أرقام أو رموز.', 'fullName', fullNameRef);
     }
 
-    const newProfile: StudentProfile = {
-      fullName: fullName.trim(),
-      email: email.trim().toLowerCase(),
-      phone: phone.trim(),
-      country,
-      jobTitleOrGoal,
-      registeredAt: studentProfile?.registeredAt || new Date().toISOString().split('T')[0],
-    };
+    // البريد الإلكتروني: فورمات صحيح فعليًا
+    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanEmail)) {
+      return fail('اكتب بريدًا إلكترونيًا صحيحًا (مثال: name@example.com).', 'email', emailRef);
+    }
 
-    const res = onSaveProfile(newProfile);
-    if (res && res.isPending) {
-      setIsPendingApproval(true);
-    } else {
-      setIsSuccess(true);
-      setTimeout(() => {
-        setIsSuccess(false);
-        onClose();
-      }, 1000);
+    // الهاتف: أرقام بس، وطول منطقي (لو مصر: لازم يبدأ بـ 01 و11 رقم بالظبط)
+    const phoneDigitsOnly = cleanPhone.replace(/\s|-/g, '');
+    if (!/^[0-9+]+$/.test(phoneDigitsOnly) || phoneDigitsOnly.length < 8) {
+      return fail('اكتب رقم هاتف صحيح (أرقام فقط).', 'phone', phoneRef);
+    }
+    if (cleanCountry === 'مصر' && !/^01[0125][0-9]{8}$/.test(phoneDigitsOnly)) {
+      return fail('رقم الهاتف المصري يجب أن يكون 11 رقمًا ويبدأ بـ 010 أو 011 أو 012 أو 015.', 'phone', phoneRef);
+    }
+
+    // الدولة: مطلوبة
+    if (!cleanCountry) {
+      return fail('اكتب اسم الدولة.', 'country', countryRef);
+    }
+
+    // الهدف/المجال
+    if (!goal) {
+      return fail('اختر هدفك أو مجالك.', 'goal', goalRef);
+    }
+    const cleanCustomGoal = customGoal.trim();
+    if (goal === OTHER_GOAL_VALUE && cleanCustomGoal.length < 3) {
+      return fail('اكتب اسم الكورس أو المجال اللي تقصده بوضوح.', 'customGoal', customGoalRef);
+    }
+
+    // كلمة المرور
+    if (password.length < 6) {
+      return fail('كلمة المرور يجب أن تكون 6 أحرف على الأقل.', 'password', passwordRef);
+    }
+    if (/\s/.test(password)) {
+      return fail('كلمة المرور يجب ألا تحتوي على مسافات.', 'password', passwordRef);
+    }
+    if (password !== confirmPassword) {
+      return fail('كلمتا المرور غير متطابقتين.', 'confirmPassword', confirmPasswordRef);
+    }
+
+    const finalGoal = goal === OTHER_GOAL_VALUE ? cleanCustomGoal : goal;
+    setSaving(true);
+    try {
+      await createUserWithEmailAndPassword(auth, cleanEmail, password);
+      await onSaveProfile({
+        fullName: cleanName,
+        email: cleanEmail,
+        phone: phoneDigitsOnly,
+        country: cleanCountry || 'مصر',
+        jobTitleOrGoal: finalGoal,
+        status: 'approved',
+        isApproved: true,
+      });
+      setSuccess(true);
+    } catch (err: any) {
+      console.error('Student registration error:', err);
+      if (err?.code === 'auth/email-already-in-use') return fail('هذا البريد مسجل بالفعل. استخدم بريدًا آخر أو سجّل الدخول.', 'email', emailRef);
+      if (err?.code === 'auth/weak-password') return fail('كلمة المرور يجب أن تكون 6 أحرف على الأقل.', 'password', passwordRef);
+      if (err?.code === 'auth/network-request-failed') setError('تعذر الاتصال بـ Firebase. افحص الإنترنت.');
+      else setError('لم يتم حفظ الحساب. النموذج ما زال مفتوحًا، حاول مرة أخرى.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  return (
-    <div 
-      onClick={onClose}
-      className="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in font-arabic flex min-h-full items-center justify-center"
-    >
-      <div 
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden relative transition-all my-auto flex flex-col max-h-[85vh] sm:max-h-[90vh] min-h-0"
-      >
-        
-        {/* Header decoration banner */}
-        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-5 sm:p-6 text-white relative shrink-0">
-          <button
-            onClick={onClose}
-            className="absolute top-4 left-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors z-10 cursor-pointer"
-            title="إغلاق والرجوع"
-          >
-            <X className="w-5 h-5" />
+  if (success) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 font-arabic" dir="rtl">
+        <div className="w-full max-w-md rounded-3xl bg-[#0d1322] border border-slate-800 p-7 text-center shadow-2xl text-white">
+          <CheckCircle2 className="mx-auto mb-3 h-14 w-14 text-emerald-500" />
+          <h2 className="text-xl font-black text-white">تم إنشاء الحساب</h2>
+          <p className="mt-2 text-sm text-slate-400">يمكنك الآن استخدام البريد وكلمة المرور لتسجيل الدخول.</p>
+          <button type="button" onClick={onClose} className="mt-6 w-full rounded-xl bg-emerald-500 py-3 font-black text-slate-950 cursor-pointer">
+            إغلاق
           </button>
+        </div>
+      </div>
+    );
+  }
 
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/80 backdrop-blur-sm p-4 font-arabic" dir="rtl">
+      <form onSubmit={submit} className="w-full max-w-lg rounded-3xl bg-[#0d1322] border border-slate-800 p-6 shadow-2xl text-white my-8">
+        <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner shrink-0">
-              <UserCheck className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-200" />
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+              <UserPlus className="h-6 w-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg sm:text-xl font-bold">تسجيل بيانات الطالب والمتدرب</h3>
-                <span className="px-2 py-0.5 text-[10px] sm:text-xs bg-amber-400 text-slate-950 font-extrabold rounded-full">خطوة أولى</span>
-              </div>
-              <p className="text-[11px] sm:text-xs text-emerald-100 mt-0.5">
-                سجّل بياناتك الأساسية لتفعيل حسابك وإصدار الشهادات الرسمية باسمك الثلاثي.
-              </p>
+              <h2 className="text-lg font-black text-white">تسجيل طالب جديد</h2>
+              <p className="text-xs text-slate-400">أنشئ حسابك للتعلم ومتابعة تقدمك</p>
             </div>
           </div>
+          <button type="button" onClick={onClose} className="rounded-xl bg-slate-800 p-2 text-slate-400 hover:text-white transition-all cursor-pointer">
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        {/* Content body */}
-        {isPendingApproval ? (
-          <div className="p-6 sm:p-10 text-center space-y-4 overflow-y-auto touch-pan-y">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center border border-amber-200 dark:border-amber-800 shadow-lg">
-              <Clock className="w-7 h-7 sm:w-8 sm:h-8 animate-spin" />
-            </div>
-            <div className="space-y-2">
-              <span className="px-3 py-1 text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 rounded-full border border-amber-300 dark:border-amber-800">
-                في انتظار موافقة صاحب المنصة 👑
-              </span>
-              <h4 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white pt-1">
-                تم إرسال طلب تفعيل الحساب
-              </h4>
-            </div>
-            <p className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm leading-relaxed max-w-md mx-auto bg-amber-50/50 dark:bg-amber-950/30 p-4 rounded-2xl border border-amber-200/60 dark:border-amber-800/60">
-              مرحباً بك <span className="font-bold text-amber-600 dark:text-amber-400">{fullName}</span>. تم إرسال طلب تسجيلك بنجاح إلى قسم <span className="font-bold">"طلبات الموافقة"</span> لدى مالك المنصة. يلزم موافقة مالك المنصة لتفعيل حسابك ومباشرة الدخول للدروس.
-            </p>
-            <div className="pt-2">
-              <button
-                onClick={onClose}
-                className="w-full py-3 px-6 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-800 dark:hover:bg-slate-700 font-bold text-xs sm:text-sm rounded-xl transition-all"
-              >
-                حسناً، فهمت ذلك (متابعة)
-              </button>
-            </div>
+        {error && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/30 p-3 text-xs font-bold text-rose-400">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
           </div>
-        ) : isSuccess ? (
-          <div className="p-8 sm:p-10 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center animate-bounce">
-              <CheckCircle2 className="w-10 h-10" />
-            </div>
-            <h4 className="text-2xl font-bold text-slate-900 dark:text-white">تم حفظ البيانات بنجاح!</h4>
-            <p className="text-slate-600 dark:text-slate-300 text-sm">
-              أهلاً بك <span className="font-bold text-emerald-600">{fullName}</span>، يمكنك الآن البدء مباشرة في التدريب والدورات.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0 touch-pan-y overscroll-contain">
-            {errorMsg && (
-              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 rounded-2xl text-rose-700 dark:text-rose-300 text-xs font-semibold">
-                ⚠️ {errorMsg}
-              </div>
-            )}
+        )}
 
-            {/* Name Input */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <GraduationCap className="w-4 h-4 text-emerald-600" />
-                <span>الاسم الكامل (ثلاثي) <span className="text-rose-500">*</span></span>
-              </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-xs font-bold text-slate-300">
+            الاسم الكامل
+            <input
+              ref={fullNameRef}
+              required
+              value={fullName}
+              onChange={(e) => { setFullName(e.target.value); if (fieldError === 'fullName') setFieldError(''); }}
+              className={fieldClass('fullName')}
+            />
+          </label>
+
+          <label className="text-xs font-bold text-slate-300">
+            البريد الإلكتروني
+            <div className="relative">
+              <Mail className="absolute right-3 top-3.5 h-4 w-4 text-slate-400" />
               <input
-                type="text"
+                ref={emailRef}
                 required
-                placeholder="مثال: أحمد محمد علي"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none transition-all"
-              />
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                ملاحظة: سيُطبَع هذا الاسم بدقة كما هو على شهادة التخرج المعتمدة.
-              </p>
-            </div>
-
-            {/* Email Input */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <Mail className="w-4 h-4 text-emerald-600" />
-                <span>البريد الإلكتروني <span className="text-rose-500">*</span></span>
-              </label>
-              <input
                 type="email"
-                required
-                placeholder="student@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none transition-all"
+                onChange={(e) => { setEmail(e.target.value); if (fieldError === 'email') setFieldError(''); }}
+                className={`${fieldClass('email')} pr-10`}
               />
             </div>
+          </label>
 
-            {/* Phone & Country row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Phone className="w-4 h-4 text-emerald-600" />
-                  <span>رقم الجوال / الهاتف</span>
-                </label>
-                <input
-                  type="tel"
-                  placeholder="+20 100 000 0000"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none transition-all"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-emerald-600" />
-                  <span>الدولة / البلد</span>
-                </label>
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none transition-all"
-                >
-                  <option value="مصر">مصر</option>
-                  <option value="المملكة العربية السعودية">المملكة العربية السعودية</option>
-                  <option value="الإمارات العربية المتحدة">الإمارات العربية المتحدة</option>
-                  <option value="الكويت">الكويت</option>
-                  <option value="الأردن">الأردن</option>
-                  <option value="المغرب">المغرب</option>
-                  <option value="دولة أخرى">دولة أخرى</option>
-                </select>
-              </div>
+          <label className="text-xs font-bold text-slate-300">
+            الهاتف
+            <div className="relative">
+              <Phone className="absolute right-3 top-3.5 h-4 w-4 text-slate-400" />
+              <input
+                ref={phoneRef}
+                value={phone}
+                onChange={(e) => { setPhone(e.target.value); if (fieldError === 'phone') setFieldError(''); }}
+                placeholder="01xxxxxxxxx"
+                className={`${fieldClass('phone')} pr-10`}
+              />
             </div>
+          </label>
 
-            {/* Goal/Target Specialization */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <Target className="w-4 h-4 text-emerald-600" />
-                <span>المجال أو الهدف التعليمي الرئيسي</span>
-              </label>
+          <label className="text-xs font-bold text-slate-300">
+            الدولة
+            <input
+              ref={countryRef}
+              value={country}
+              onChange={(e) => { setCountry(e.target.value); if (fieldError === 'country') setFieldError(''); }}
+              className={fieldClass('country')}
+            />
+          </label>
+
+          {/* حقل الهدف/المجال - قائمة اختيار بدل الكتابة الحرة */}
+          <label className="text-xs font-bold text-slate-300 sm:col-span-2">
+            هدفك أو مجالك
+            <div className="relative">
+              <Target className="absolute right-3 top-3.5 h-4 w-4 text-slate-400 pointer-events-none" />
               <select
-                value={jobTitleOrGoal}
-                onChange={(e) => setJobTitleOrGoal(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none transition-all"
+                ref={goalRef}
+                required
+                value={goal}
+                onChange={(e) => { setGoal(e.target.value); if (fieldError === 'goal') setFieldError(''); }}
+                className={`${fieldClass('goal')} appearance-none pr-10 cursor-pointer`}
               >
-                <option value="برمجة وتطوير الويب">برمجة وتطوير الويب (Frontend / Fullstack)</option>
-                <option value="الذكاء الاصطناعي وهندسة الأوامر">الذكاء الاصطناعي وهندسة الأوامر (Prompting & AI)</option>
-                <option value="تصميم واجهات تجربة المستخدم UI/UX">تصميم واجهات تجربة المستخدم (UI/UX Design)</option>
-                <option value="علوم البيانات والتحليل الإحصائي">علوم البيانات والتحليل الإحصائي (Data Science)</option>
-                <option value="الأمن السيبراني وحماية الشبكات">الأمن السيبراني وحماية الشبكات (Cybersecurity)</option>
+                <option value="" disabled>
+                  اختر مجالك أو هدفك التعليمي...
+                </option>
+                {GOAL_OPTIONS.map((group) => (
+                  <optgroup key={group.group} label={group.group}>
+                    {group.options.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </div>
 
-            {/* Submit Button */}
-            <div className="pt-2 flex items-center gap-3">
-              <button
-                type="submit"
-                className="flex-1 py-3 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm rounded-xl shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>حفظ البيانات وبدء التدريب الآن</span>
-              </button>
-
-              {!isInitialRequired && (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold"
-                >
-                  إلغاء
-                </button>
-              )}
-            </div>
-
-            {/* Logout Section at the bottom */}
-            {studentProfile && onLogout && (
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-rose-50/50 dark:bg-rose-950/30 p-3.5 rounded-2xl border border-rose-100 dark:border-rose-900/50">
-                <div className="text-xs text-slate-600 dark:text-slate-400">
-                  <span className="font-bold text-slate-800 dark:text-slate-200 block">تسجيل الخروج النهائي</span>
-                  <span className="text-[11px] text-slate-500">حساب الطالب: {studentProfile.fullName}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onLogout();
-                    onClose();
-                  }}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shrink-0"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>تسجيل خروج</span>
-                </button>
-              </div>
+            {goal === OTHER_GOAL_VALUE && (
+              <input
+                ref={customGoalRef}
+                autoFocus
+                required
+                value={customGoal}
+                onChange={(e) => { setCustomGoal(e.target.value); if (fieldError === 'customGoal') setFieldError(''); }}
+                placeholder="اكتب الكورس أو المجال اللي تقصده..."
+                className={`${fieldClass('customGoal')} mt-2`}
+              />
             )}
-          </form>
-        )}
-      </div>
+          </label>
+
+          <label className="text-xs font-bold text-slate-300">
+            كلمة المرور
+            <div className="relative">
+              <Lock className="absolute right-3 top-3.5 h-4 w-4 text-slate-400" />
+              <input
+                ref={passwordRef}
+                required
+                type="password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); if (fieldError === 'password') setFieldError(''); }}
+                className={`${fieldClass('password')} pr-10`}
+              />
+            </div>
+          </label>
+
+          <label className="text-xs font-bold text-slate-300">
+            تأكيد كلمة المرور
+            <input
+              ref={confirmPasswordRef}
+              required
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => { setConfirmPassword(e.target.value); if (fieldError === 'confirmPassword') setFieldError(''); }}
+              className={fieldClass('confirmPassword')}
+            />
+          </label>
+        </div>
+
+        <button
+          disabled={saving}
+          className="mt-5 w-full rounded-xl bg-emerald-500 hover:bg-emerald-400 py-3 font-black text-slate-950 disabled:opacity-60 transition-all cursor-pointer active:scale-95"
+        >
+          {saving ? 'جارٍ إنشاء الحساب...' : 'إنشاء الحساب'}
+        </button>
+      </form>
     </div>
   );
 };
+
+export default StudentRegistrationModal;
